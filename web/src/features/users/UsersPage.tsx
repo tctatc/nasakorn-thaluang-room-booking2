@@ -19,7 +19,7 @@ import { useToast } from '../../components/ui/Toast';
 import { cn } from '../../lib/cn';
 import { useLookups } from '../../lib/hooks/useLookups';
 
-const inputClass = 'min-h-11 w-full rounded-control border border-line bg-surface px-3 text-[15px] text-ink outline-none transition-colors duration-150 focus:border-brand focus:ring-2 focus:ring-brand/20 disabled:bg-surface-sunken disabled:text-ink-muted';
+const inputClass = 'min-h-11 w-full rounded-control border border-line bg-surface px-3 text-base text-ink outline-none transition-colors duration-150 focus:border-brand focus:ring-2 focus:ring-brand/20 disabled:bg-surface-sunken disabled:text-ink-muted';
 const labelClass = 'mb-1.5 block text-sm font-medium text-ink';
 
 /** สิ่งที่แต่ละสิทธิ์ทำได้ — แสดงตอนเลือกสิทธิ์ให้ผู้ดูแลเห็นผลก่อนกดบันทึก */
@@ -136,9 +136,9 @@ export function UsersPage() {
               <li key={step.step} className={cn('rounded-card bg-surface p-4 ring-1', holders.length ? 'ring-line' : 'ring-warn-border bg-warn-soft')}>
                 <p className="text-xs text-ink-muted">ขั้นที่ {step.step} · {step.action}</p>
                 {holders.length ? (
-                  <p className="mt-1 text-[15px] font-medium text-ink">{holders.map((user) => user.displayName).join(', ')}</p>
+                  <p className="mt-1 text-base font-medium text-ink">{holders.map((user) => user.displayName).join(', ')}</p>
                 ) : (
-                  <p className="mt-1 text-[15px] font-medium text-warn">ยังไม่มีผู้ลงนาม คำขอจะค้างที่ขั้นนี้</p>
+                  <p className="mt-1 text-base font-medium text-warn">ยังไม่มีผู้ลงนาม คำขอจะค้างที่ขั้นนี้</p>
                 )}
               </li>
             );

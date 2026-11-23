@@ -136,7 +136,7 @@ function Badge({ count, className }: { count: number; className?: string }) {
     <span
       aria-hidden="true"
       className={cn(
-        'grid h-[18px] min-w-[18px] place-items-center rounded-full bg-danger px-1 text-[11px] font-semibold leading-none text-ink-inverse ring-2 ring-surface',
+        'grid h-[18px] min-w-[18px] place-items-center rounded-full bg-danger px-1 text-xs font-semibold leading-none text-ink-inverse ring-2 ring-surface',
         className,
       )}
     >
@@ -205,7 +205,7 @@ function MoreSheet({
                   onClick={onClose}
                   className={({ isActive }) =>
                     cn(
-                      'flex min-h-14 items-center gap-3 rounded-2xl px-3 text-[15px] font-medium transition-colors duration-150',
+                      'flex min-h-14 items-center gap-3 rounded-2xl px-3 text-base font-medium transition-colors duration-150',
                       isActive ? 'bg-brand-soft text-brand' : 'text-ink active:bg-neutral-soft',
                     )
                   }

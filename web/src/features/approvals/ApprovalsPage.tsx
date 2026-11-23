@@ -111,7 +111,7 @@ export function ApprovalsPage() {
                   {reasonId === booking.bookingId && (
                     <div className="mt-4">
                       <label className="mb-1.5 block text-sm font-medium text-ink" htmlFor={`reject-${booking.bookingId}`}>เหตุผลที่ไม่อนุมัติ</label>
-                      <textarea id={`reject-${booking.bookingId}`} autoFocus required className="min-h-20 w-full rounded-control border border-line bg-surface px-3 py-2 text-[15px] outline-none focus:border-danger focus:ring-2 focus:ring-danger/20" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="แจ้งเหตุผลให้ผู้ขอทราบ เช่น ห้องมีกิจกรรมของวิทยาลัย" />
+                      <textarea id={`reject-${booking.bookingId}`} autoFocus required className="min-h-20 w-full rounded-control border border-line bg-surface px-3 py-2 text-base outline-none focus:border-danger focus:ring-2 focus:ring-danger/20" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="แจ้งเหตุผลให้ผู้ขอทราบ เช่น ห้องมีกิจกรรมของวิทยาลัย" />
                     </div>
                   )}
                   <div className="mt-5 flex flex-wrap justify-end gap-2 border-t border-line pt-4">

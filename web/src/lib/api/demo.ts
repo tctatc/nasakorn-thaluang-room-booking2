@@ -11,12 +11,17 @@
 import { DEFAULT_SYSTEM_SETTINGS, type SystemSettings } from '@shared/schemas/settings';
 import type { RoomEquipment, RoomStatus } from '@shared/schemas/room';
 import type { BookingStatus } from '@shared/domain/status';
-import { addDaysToDateKey, toDateKey } from '@shared/time/bangkok';
-import { validateBookingRequest, validateAvailabilityInput } from '@shared/schemas/booking';
+import { addDaysToDateKey, fromDateKeyAndMinutes, toDateKey } from '@shared/time/bangkok';
+import { validateBookingRequest, validateAvailabilityInput, type BookingRequest } from '@shared/schemas/booking';
 import { validateBookingRules } from '@shared/domain/booking-rules';
 import { findConflicts } from '@shared/domain/overlap';
 import { readLocal, writeLocal } from '../storage';
-import { busySlotsFor } from '@shared/domain/availability';
+import { busySlotsFor, publicSlotsBetween } from '@shared/domain/availability';
+import {
+  GUEST_BOOKINGS_PER_HOUR, TRACKING_MISSES_PER_HOUR, guestAccountId, guestRequesterIssues, normalizeTrackingCode,
+  trackingCodeFromBytes, validateScheduleRange,
+} from '@shared/schemas/guest';
+import { canCancelBooking } from '@shared/domain/booking-rules';
 import { approvedSlotsOn } from '@shared/domain/room-status';
 import { ApiError, type AdminUser, type SessionUser, type Transport, type VersionResult } from './types';
 import { activeAnnouncements, validateAnnouncementInput, type Announcement } from '@shared/schemas/announcement';
@@ -76,6 +81,13 @@ export interface DemoBooking {
   meetingType?: string;
   /** เวลาที่ยื่นคำขอ (ISO) — พิมพ์เป็น "เขียนวันที่" ในแบบฟอร์ม */
   createdAt?: string;
+  /** รหัสติดตามสถานะ — ส่งให้เฉพาะเจ้าของและผู้ดูแล (คนอื่นได้ '') */
+  trackingCode?: string;
+}
+
+/** รหัสติดตามจากตัวสุ่มของเบราว์เซอร์ (crypto) เหมือนที่ Apps Script ใช้ UUID v4 */
+function newTrackingCode(): string {
+  return trackingCodeFromBytes(crypto.getRandomValues(new Uint8Array(32)));
 }
 
 interface DemoUser extends SessionUser {
@@ -423,6 +435,59 @@ export function createDemoTransport(): Transport {
     saveState(state);
   }
 
+  /** ตัวนับต่อชั่วโมง (แทน CacheService ของ Apps Script) */
+  const counters = new Map<string, number>();
+  const hourKey = (name: string) => `${name}:${Math.floor(Date.now() / 3_600_000)}`;
+  const hourly = (name: string) => counters.get(hourKey(name)) ?? 0;
+  const count = (name: string) => counters.set(hourKey(name), hourly(name) + 1);
+
+  /** รหัสติดตามส่งให้เฉพาะเจ้าของและผู้ดูแล เหมือน publicBooking_ ฝั่ง Apps Script */
+  function viewFor(booking: DemoBooking, user: SessionUser): DemoBooking {
+    return user.role === 'admin' || booking.userEmail === user.email ? booking : { ...booking, trackingCode: '' };
+  }
+
+  function findByCode(raw: unknown): DemoBooking {
+    if (hourly('tracking-misses') >= TRACKING_MISSES_PER_HOUR) {
+      throw new ApiError('BUSY', 'มีการค้นรหัสผิดหลายครั้ง ปิดการค้นชั่วคราว กรุณาลองใหม่ภายหลัง');
+    }
+    const code = normalizeTrackingCode(raw);
+    const booking = code === '' ? undefined : state.bookings.find((item) => item.trackingCode === code);
+    if (!booking) {
+      count('tracking-misses');
+      throw new ApiError('NOT_FOUND', 'ไม่พบคำขอจากรหัสนี้ ตรวจรหัสอีกครั้ง (10 ตัว เช่น ABCDE-FGHJK)');
+    }
+    return booking;
+  }
+
+  /** บันทึกการจองในนามผู้ใช้ที่ล็อกอินหรือผู้จองทั่วไป — กฎเดียวกับ createBookingAs_ ฝั่ง Apps Script */
+  function createAs(user: SessionUser, input: BookingRequest) {
+    if (!input.termsAccepted) throw new ApiError('VALIDATION', 'กรุณายอมรับเงื่อนไขการใช้ห้องประชุม');
+    if (unknownLookupKeys(liveLookups(), 'facility', input.requestedFacilities).length > 0) {
+      throw new ApiError('VALIDATION', 'มีอุปกรณ์ที่ถูกปิดใช้ไปแล้ว กรุณาเลือกใหม่');
+    }
+    if (input.meetingType !== '' && unknownLookupKeys(liveLookups(), 'meetingType', [input.meetingType]).length > 0) {
+      throw new ApiError('VALIDATION', 'ประเภทการประชุมนี้ถูกปิดใช้ไปแล้ว กรุณาเลือกใหม่');
+    }
+    const room = state.rooms.find((item) => item.roomId === input.roomId);
+    if (!room) throw new ApiError('NOT_FOUND', 'ไม่พบห้องประชุม');
+    if (!canUseRoom(user, room.roomId)) throw new ApiError('FORBIDDEN', 'บัญชีของคุณยังไม่ได้รับสิทธิ์จองห้องนี้ กรุณาติดต่อผู้ดูแลระบบ');
+    const activeCount = state.bookings.filter((item) => item.userEmail === user.email && ['pending', 'confirmed'].includes(item.status)).length;
+    const rules = validateBookingRules(input, { settings: state.settings, room, now: new Date(), isAdmin: user.role === 'admin', activeBookingCount: activeCount });
+    if (!rules.ok) throw new ApiError('VALIDATION', rules.issues.map((issue) => issue.message).join(' · '));
+    const openLocation = isOpenLocationRoom(room);
+    if (openLocation && input.customLocation.trim() === '') throw new ApiError('VALIDATION', 'กรุณาระบุสถานที่ที่ต้องการใช้');
+    const conflicts = openLocation ? [] : findConflicts({ startMin: input.startMin, endMin: input.endMin }, state.bookings.filter((item) => item.roomId === room.roomId && item.dateKey === input.dateKey && ['pending', 'confirmed'].includes(item.status)).map((item) => ({ bookingId: item.bookingId, startMin: item.startMin, endMin: item.endMin })));
+    if (conflicts.length) throw new ApiError('CONFLICT', 'ช่วงเวลานี้มีผู้จองแล้ว กรุณาเลือกเวลาใหม่');
+    const needsApproval = state.settings.approvalRequired;
+    const booking: DemoBooking = {
+      ...input, customLocation: openLocation ? input.customLocation : '', bookingId: `demo-bk-${Date.now()}`,
+      status: needsApproval ? 'pending' : 'confirmed', approvalStep: needsApproval ? 1 : 0, approvalLog: [],
+      userEmail: user.email, userName: user.displayName, createdAt: new Date().toISOString(), trackingCode: newTrackingCode(),
+    };
+    state.bookings.push(booking); changed();
+    return { booking, trackingCode: booking.trackingCode! };
+  }
+
   const handlers: Record<string, (payload: never, token: string) => unknown> = {
     ping: () => ({ pong: true, serverTime: new Date().toISOString() }),
 
@@ -544,6 +609,7 @@ export function createDemoTransport(): Transport {
       serverTime: new Date().toISOString(),
     }),
     rooms: (_payload, token) => {
+      if (!token) return { rooms: state.rooms };
       const user = userFromToken(token);
       return { rooms: state.rooms.filter((room) => canUseRoom(user, room.roomId)) };
     },
@@ -552,17 +618,15 @@ export function createDemoTransport(): Transport {
       return { bookings: state.bookings.filter((booking) =>
         (canSeeAllBookings(user.role) || booking.userEmail === user.email) &&
         (!payload.from || booking.dateKey >= payload.from) && (!payload.to || booking.dateKey <= payload.to),
-      ) };
+      ).map((booking) => viewFor(booking, user)) };
     },
-    availability: (payload: unknown, token) => {
-      userFromToken(token);
+    availability: (payload: unknown) => {
       const parsed = validateAvailabilityInput(payload);
       if (!parsed.ok) throw new ApiError('VALIDATION', parsed.issues.map((issue) => issue.message).join(' '), parsed.issues);
       if (isOpenLocationRoom(state.rooms.find((room) => room.roomId === parsed.value.roomId))) return { busy: [] };
       return { busy: busySlotsFor(state.bookings, parsed.value.roomId, parsed.value.dateKey) };
     },
-    roomSlotsToday: (_payload, token) => {
-      userFromToken(token);
+    roomSlotsToday: () => {
       const dateKey = toDateKey(new Date());
       return { dateKey, slots: approvedSlotsOn(state.bookings, dateKey) };
     },
@@ -570,32 +634,45 @@ export function createDemoTransport(): Transport {
       const user = userFromToken(token);
       const parsed = validateBookingRequest(payload);
       if (!parsed.ok) throw new ApiError('VALIDATION', parsed.issues.map((issue) => issue.message).join(' · '), parsed.issues);
+      return createAs(user, parsed.value);
+    },
+    publicBootstrap: () => ({ settings: state.settings, dataVersion: state.dataVersion, serverTime: new Date().toISOString() }),
+    publicSchedule: (payload: unknown) => {
+      const parsed = validateScheduleRange(payload);
+      if (!parsed.ok) throw new ApiError('VALIDATION', issues(parsed), parsed.issues);
+      return { slots: publicSlotsBetween(state.bookings, parsed.value.from, parsed.value.to) };
+    },
+    guestBooking: (payload: { website?: unknown }) => {
+      if (payload?.website) throw new ApiError('VALIDATION', 'ส่งคำขอไม่สำเร็จ กรุณาลองใหม่');
+      const parsed = validateBookingRequest(payload);
+      if (!parsed.ok) throw new ApiError('VALIDATION', parsed.issues.map((issue) => issue.message).join(' · '), parsed.issues);
+      const guestIssues = guestRequesterIssues(parsed.value);
+      if (guestIssues.length) throw new ApiError('VALIDATION', guestIssues[0]!.message, guestIssues);
+      if (hourly('guest-bookings') >= GUEST_BOOKINGS_PER_HOUR) {
+        throw new ApiError('BUSY', 'มีคำขอจองเข้ามามากผิดปกติ ระบบหยุดรับชั่วคราว กรุณาลองใหม่ในอีกสักครู่ หรือติดต่อเจ้าหน้าที่');
+      }
       const input = parsed.value;
-      if (!input.termsAccepted) throw new ApiError('VALIDATION', 'กรุณายอมรับเงื่อนไขการใช้ห้องประชุม');
-      if (unknownLookupKeys(liveLookups(), 'facility', input.requestedFacilities).length > 0) {
-        throw new ApiError('VALIDATION', 'มีอุปกรณ์ที่ถูกปิดใช้ไปแล้ว กรุณาเลือกใหม่');
-      }
-      if (input.meetingType !== '' && unknownLookupKeys(liveLookups(), 'meetingType', [input.meetingType]).length > 0) {
-        throw new ApiError('VALIDATION', 'ประเภทการประชุมนี้ถูกปิดใช้ไปแล้ว กรุณาเลือกใหม่');
-      }
-      const room = state.rooms.find((item) => item.roomId === input.roomId);
-      if (!room) throw new ApiError('NOT_FOUND', 'ไม่พบห้องประชุม');
-      if (!canUseRoom(user, room.roomId)) throw new ApiError('FORBIDDEN', 'บัญชีของคุณยังไม่ได้รับสิทธิ์จองห้องนี้ กรุณาติดต่อผู้ดูแลระบบ');
-      const activeCount = state.bookings.filter((item) => item.userEmail === user.email && ['pending','confirmed'].includes(item.status)).length;
-      const rules = validateBookingRules(input, { settings: state.settings, room, now: new Date(), isAdmin: user.role === 'admin', activeBookingCount: activeCount });
-      if (!rules.ok) throw new ApiError('VALIDATION', rules.issues.map((issue) => issue.message).join(' · '));
-      const openLocation = isOpenLocationRoom(room);
-      if (openLocation && input.customLocation.trim() === '') throw new ApiError('VALIDATION', 'กรุณาระบุสถานที่ที่ต้องการใช้');
-      const conflicts = openLocation ? [] : findConflicts({ startMin: input.startMin, endMin: input.endMin }, state.bookings.filter((item) => item.roomId === room.roomId && item.dateKey === input.dateKey && ['pending','confirmed'].includes(item.status)).map((item) => ({ bookingId: item.bookingId, startMin: item.startMin, endMin: item.endMin })));
-      if (conflicts.length) throw new ApiError('CONFLICT', 'ช่วงเวลานี้มีผู้จองแล้ว กรุณาเลือกเวลาใหม่');
-      const needsApproval = state.settings.approvalRequired;
-      const booking: DemoBooking = {
-        ...input, customLocation: openLocation ? input.customLocation : '', bookingId: `demo-bk-${Date.now()}`,
-        status: needsApproval ? 'pending' : 'confirmed', approvalStep: needsApproval ? 1 : 0, approvalLog: [],
-        userEmail: user.email, userName: user.displayName, createdAt: new Date().toISOString(),
-      };
-      state.bookings.push(booking); state.dataVersion += 1; saveState(state);
-      return { booking };
+      const result = createAs({
+        email: guestAccountId(input.requesterPhone), displayName: input.bookerName, department: input.department,
+        position: input.requesterPosition, role: 'staff', status: 'active', allowedRoomIds: [],
+      }, input);
+      count('guest-bookings');
+      return result;
+    },
+    trackBooking: (payload: { code?: unknown }) => {
+      const booking = findByCode(payload?.code);
+      return { booking: { ...booking }, room: state.rooms.find((room) => room.roomId === booking.roomId) ?? null };
+    },
+    trackCancel: (payload: { code?: unknown; reason?: unknown }) => {
+      const booking = findByCode(payload?.code);
+      if (!['pending', 'confirmed'].includes(booking.status)) throw new ApiError('CONFLICT', 'คำขอนี้ยกเลิกไม่ได้แล้ว');
+      const rule = canCancelBooking({
+        startInstant: fromDateKeyAndMinutes(booking.dateKey, booking.startMin), now: new Date(), settings: state.settings, isAdmin: false,
+      });
+      if (!rule.ok) throw new ApiError('FORBIDDEN', rule.message);
+      booking.status = 'cancelled';
+      changed();
+      return { booking: { ...booking } };
     },
     cancelBooking: (payload: { bookingId: string; reason?: string }, token) => {
       const user = userFromToken(token);
@@ -695,6 +772,7 @@ export function createDemoTransport(): Transport {
     },
 
     lookups: (_payload, token) => {
+      if (!token) return { lookups: sortLookups(liveLookups()).map((item) => ({ ...item, note: '' })) };
       userFromToken(token);
       return { lookups: sortLookups(liveLookups()) };
     },

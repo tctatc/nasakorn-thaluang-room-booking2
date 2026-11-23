@@ -18,7 +18,14 @@ import { DEMO_LOGINS } from '../lib/api/demo';
  * เหมือนตอนเปิดจาก GitHub Pages ก่อนตั้งค่า Apps Script เสร็จ
  */
 
-function renderApp() {
+/**
+ * เปิดเว็บ — ค่าเริ่มต้นเปิดหน้าเข้าสู่ระบบ (#/login) เพราะเทสส่วนใหญ่เป็นงานของเจ้าหน้าที่
+ * ส่ง path อื่น (เช่น '/') เพื่อเปิดแบบผู้จองทั่วไปที่ไม่ได้เข้าสู่ระบบ
+ */
+function renderApp(path?: string) {
+  // เปิดลิงก์ตรงที่เทสตั้งไว้แล้ว (เช่น #/reports?...) ให้คงไว้ — ไม่งั้นเปิดหน้าเข้าสู่ระบบ
+  if (path !== undefined) window.location.hash = `#${path}`;
+  else if (!window.location.hash || window.location.hash === '#/') window.location.hash = '#/login';
   return render(
     <HashRouter>
       <ToastProvider>
@@ -50,7 +57,14 @@ async function enterPinOnly(pin: string) {
 /** เข้าสู่ระบบด้วยรหัสผ่าน แล้วรอจนเห็นเมนูหลัก */
 async function signInAs(username: string, password = PASSWORDS[username] ?? '') {
   await enterPassword(username, password);
-  return screen.findByRole('navigation', { name: 'เมนูหลัก' }, { timeout: 5000 });
+  const nav = await screen.findByRole('navigation', { name: 'เมนูหลัก' }, { timeout: 5000 });
+  // เข้าระบบแล้วระบบพาออกจาก /login ไปหน้าที่ตั้งใจเปิด
+  await waitFor(() => {
+    expect(window.location.hash.startsWith('#/login')).toBe(false);
+    expect(screen.queryByRole('heading', { level: 1, name: 'เข้าสู่ระบบ' })).toBeNull();
+    expect(screen.getByRole('heading', { level: 1 })).toBeDefined();
+  });
+  return screen.getByRole('navigation', { name: 'เมนูหลัก' }) ?? nav;
 }
 
 /** กดลงนามแล้วยืนยันด้วย PIN ในหน้าต่างที่เด้งขึ้น */
@@ -75,6 +89,9 @@ async function openApp(username = 'shoyu') {
 async function signOutVia(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { expanded: false, name: /ผู้ดูแลระบบ|ผู้ใช้งาน|ผู้รับรอง|ผู้อนุมัติ|เจ้าหน้าที่ตรวจห้อง/ }));
   await user.click(screen.getByRole('menuitem', { name: /ออกจากระบบ/ }));
+  // ออกจากระบบแล้วกลับเป็นผู้จองทั่วไป (หน้าเจ้าหน้าที่จะพาไปหน้าเข้าสู่ระบบเอง) — เปิดหน้าเข้าสู่ระบบเพื่อสลับบัญชี
+  await waitFor(() => expect(screen.queryByRole('menuitem', { name: /ออกจากระบบ/ })).toBeNull());
+  window.location.hash = '#/login';
   await screen.findByRole('heading', { level: 1, name: 'เข้าสู่ระบบ' });
 }
 
@@ -343,7 +360,10 @@ describe('จองห้องจริงตั้งแต่ต้นจน�
     await user.click(screen.getByLabelText(/ดูแลรักษาทรัพย์สินของทางราชการ/));
     await user.click(screen.getByRole('button', { name: /ส่งคำขอจอง/ }));
 
-    expect(await screen.findByText('ประชุมทดสอบระบบ', {}, { timeout: 3000 })).toBeDefined();
+    // จองแล้วไปหน้าติดตามสถานะ พร้อมรหัสและ QR Code
+    expect(await screen.findByText('ส่งคำขอจองเรียบร้อยแล้ว', {}, { timeout: 3000 })).toBeDefined();
+    expect(screen.getByRole('img', { name: /QR Code ติดตามสถานะคำขอ/ })).toBeDefined();
+    expect(screen.getByRole('heading', { level: 2, name: 'ประชุมทดสอบระบบ' })).toBeDefined();
 
     // จำลองการรีเฟรช: ถอดแอปออกทั้งหมดแล้วเปิดใหม่ โดยไม่ล้าง localStorage
     cleanup();
@@ -773,5 +793,75 @@ describe('รายงานสรุปและสถานะห้องต�
     expect(within(panel as HTMLElement).getByText('หอประชุมอดิเรกสาร')).toBeDefined();
     // ห้อง "อื่น ๆ (ระบุสถานที่)" ไม่ใช่ห้องจริง ไม่ต้องบอกสถานะ
     expect(within(panel as HTMLElement).queryByText('อื่น ๆ (ระบุสถานที่)')).toBeNull();
+  });
+});
+
+describe('ผู้จองทั่วไป: จองได้โดยไม่เข้าสู่ระบบ ติดตามด้วยรหัส/QR', () => {
+  it('หน้าแรกเปิดได้โดยไม่ล็อกอิน มีปฏิทินห้องว่าง และไม่เปิดเผยชื่อหรือหัวข้อการจองของใคร', async () => {
+    renderApp('/');
+    expect(await screen.findByRole('heading', { level: 1, name: 'จองห้องประชุมได้เลย ไม่ต้องเข้าสู่ระบบ' }, { timeout: 5000 })).toBeDefined();
+    expect(await screen.findByRole('heading', { name: 'ปฏิทินห้องว่าง' })).toBeDefined();
+    await screen.findAllByText('หอประชุมอดิเรกสาร', {}, { timeout: 3000 });
+    // ข้อมูลตั้งต้นมีการจองของ อ.สมชาย เรื่องประชุมครู — หน้าสาธารณะต้องไม่มีทั้งสองอย่าง
+    expect(document.body.textContent).not.toContain('อ.สมชาย');
+    expect(document.body.textContent).not.toContain('ประชุมครูและบุคลากรประจำเดือน');
+    expect(screen.getByRole('link', { name: /เจ้าหน้าที่/ })).toBeDefined();
+  });
+
+  it('จองโดยไม่ล็อกอิน ได้รหัสติดตาม QR และสถานะรอตรวจห้อง แล้วเครื่องนี้จำคำขอไว้', async () => {
+    const user = userEvent.setup();
+    renderApp('/book');
+    await waitFor(() => expect(screen.getAllByRole('radio').some((radio) => (radio as HTMLInputElement).checked)).toBe(true), { timeout: 5000 });
+    expect(screen.getByText('จองได้เลย ไม่ต้องเข้าสู่ระบบ')).toBeDefined();
+    await user.type(screen.getByLabelText('ชื่อผู้จอง'), 'ผู้จอง ทั่วไป');
+    await user.type(screen.getByLabelText('ตำแหน่ง'), 'ครู');
+    await user.type(screen.getByLabelText('หน่วยงาน / สาขาวิชา'), 'แผนกวิชาการบัญชี');
+    await user.type(screen.getByLabelText('หมายเลขโทรศัพท์'), '089-555-0000');
+    await user.type(screen.getByLabelText('เพื่อใช้ในการดำเนินงาน เรื่อง'), 'ประชุมผู้ปกครองนักศึกษา');
+    fireEvent.change(screen.getByLabelText('วันที่'), { target: { value: '2030-01-02' } });
+    fireEvent.change(screen.getByLabelText('เริ่ม'), { target: { value: '13:00' } });
+    fireEvent.change(screen.getByLabelText('สิ้นสุด'), { target: { value: '14:00' } });
+    await user.click(screen.getByLabelText(/ดูแลรักษาทรัพย์สินของทางราชการ/));
+    await user.click(screen.getByRole('button', { name: /ส่งคำขอจอง/ }));
+
+    expect(await screen.findByText('ส่งคำขอจองเรียบร้อยแล้ว', {}, { timeout: 3000 })).toBeDefined();
+    expect(screen.getAllByText('รอเจ้าหน้าที่ตรวจห้อง').length).toBeGreaterThan(0);
+    expect(screen.getByRole('img', { name: /QR Code ติดตามสถานะคำขอ/ })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'พิมพ์แบบฟอร์มคำขอ' })).toBeDefined();
+    expect(screen.getByRole('article', { name: 'แบบคำขออนุญาตใช้ห้องประชุม' }).textContent).toContain('ประชุมผู้ปกครองนักศึกษา');
+
+    await user.click(within(screen.getByRole('navigation', { name: 'เมนูหลัก' })).getByRole('link', { name: /ติดตามสถานะ/ }));
+    expect(await screen.findByText('ประชุมผู้ปกครองนักศึกษา')).toBeDefined();
+  }, 15_000);
+
+  it('ใส่รหัสผิดรูปแบบบอกทันที รหัสที่ไม่มีอยู่บอกว่าไม่พบ', async () => {
+    const user = userEvent.setup();
+    renderApp('/track');
+    const input = await screen.findByLabelText('รหัสติดตาม', {}, { timeout: 5000 });
+    await user.type(input, '123');
+    await user.click(screen.getByRole('button', { name: 'ดูสถานะ' }));
+    expect(screen.getByRole('alert').textContent).toContain('10 ตัว');
+    await user.clear(input);
+    await user.type(input, 'abcde-fghjk');
+    await user.click(screen.getByRole('button', { name: 'ดูสถานะ' }));
+    expect(await screen.findByText(/ไม่พบคำขอจากรหัสนี้/, {}, { timeout: 3000 })).toBeDefined();
+  });
+
+  it('เปิดลิงก์หน้าของเจ้าหน้าที่โดยไม่ล็อกอิน ไปหน้าเข้าสู่ระบบ', async () => {
+    renderApp('/approvals');
+    expect(await screen.findByRole('heading', { level: 1, name: 'เข้าสู่ระบบ' }, { timeout: 5000 })).toBeDefined();
+  });
+
+  // ข้อมูลตั้งต้น: วันนี้ 09:00–10:30 หอประชุมอนุมัติแล้ว — วันเสาร์/อาทิตย์ไม่เปิดจอง จึงข้าม
+  it.skipIf([0, 6].includes(dayOfWeekOfDateKey(toDateKey(new Date()))))('ตรวจการจองซ้ำ: เลือกช่วงที่ชนแล้วบอกว่าชนกับเวลาไหน', async () => {
+    renderApp('/');
+    await screen.findByRole('heading', { name: 'ปฏิทินห้องว่าง' }, { timeout: 5000 });
+    await screen.findAllByText('หอประชุมอดิเรกสาร', {}, { timeout: 3000 });
+    fireEvent.change(screen.getByLabelText('เริ่ม'), { target: { value: '09:30' } });
+    fireEvent.change(screen.getByLabelText('สิ้นสุด'), { target: { value: '10:00' } });
+    const hall = screen.getAllByRole('heading', { level: 3, name: 'หอประชุมอดิเรกสาร' })[0]!.closest('li')!;
+    expect(await within(hall).findByText(/ชนกับการจอง 09:00–10:30/)).toBeDefined();
+    const other = screen.getByRole('heading', { level: 3, name: 'ห้องประชุม (กาแฟ)' }).closest('li')!;
+    expect(within(other).getByText('ว่าง จองได้')).toBeDefined();
   });
 });

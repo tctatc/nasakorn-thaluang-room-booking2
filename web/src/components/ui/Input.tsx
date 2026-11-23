@@ -56,7 +56,7 @@ export function Input({
           aria-invalid={error !== undefined || undefined}
           aria-describedby={describedBy}
           className={cn(
-            'min-h-11 w-full rounded-control bg-surface px-3 text-[15px] text-ink',
+            'min-h-11 w-full rounded-control bg-surface px-3 text-base text-ink',
             'ring-1 ring-line transition-[box-shadow] duration-150',
             'placeholder:text-ink-subtle',
             'hover:ring-line-strong focus:ring-2 focus:ring-brand focus:outline-none',

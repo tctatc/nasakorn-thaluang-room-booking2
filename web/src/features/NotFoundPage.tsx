@@ -9,7 +9,7 @@ export function NotFoundPage() {
       action={
         <Link
           to="/"
-          className="inline-flex min-h-11 items-center rounded-control bg-brand px-4 text-[15px] font-medium text-ink-inverse transition-colors hover:bg-brand-hover"
+          className="inline-flex min-h-11 items-center rounded-control bg-brand px-4 text-base font-medium text-ink-inverse transition-colors hover:bg-brand-hover"
         >
           กลับไปหน้าภาพรวม
         </Link>

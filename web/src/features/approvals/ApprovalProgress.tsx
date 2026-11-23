@@ -56,13 +56,13 @@ export function ApprovalProgress({
               <span className="sr-only">: {stateText}</span>
             </p>
             {entry ? (
-              <p className="truncate text-[11px] leading-tight text-ink-muted" title={entry.name}>
+              <p className="truncate text-xs leading-tight text-ink-muted" title={entry.name}>
                 {entry.name}
                 <br />
                 {signedDate(entry.at)}
               </p>
             ) : (
-              state === 'current' && <p className="text-[11px] leading-tight text-warn">{step.waiting}</p>
+              state === 'current' && <p className="text-xs leading-tight text-warn">{step.waiting}</p>
             )}
           </li>
         );

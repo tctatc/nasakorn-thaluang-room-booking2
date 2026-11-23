@@ -113,6 +113,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   }, [api, isDemo, applyBootstrap, bootAttempt]);
 
+  // ยังไม่เข้าสู่ระบบ: ผู้จองทั่วไปยังต้องใช้กฎการจอง (เวลาทำการ ความยาวขั้นต่ำ) ในฟอร์ม
+  useEffect(() => {
+    if (phase !== 'anonymous' || settings !== null) return;
+    let cancelled = false;
+    api.publicBootstrap()
+      .then((result) => {
+        if (cancelled) return;
+        setSettings(result.settings);
+        setDataVersion(result.dataVersion);
+        setServerTime(new Date(result.serverTime));
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) setBootError(error instanceof Error ? error.message : 'เชื่อมต่อระบบไม่สำเร็จ');
+      });
+    return () => { cancelled = true; };
+  }, [api, phase, settings, bootAttempt]);
+
   const startSession = useCallback(
     async (result: LoginResult) => {
       const boot = await api.bootstrap(result.token);

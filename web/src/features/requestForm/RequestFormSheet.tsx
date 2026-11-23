@@ -166,7 +166,7 @@ function SignBox({ title, signedText, name, position, date, children, showDate =
       <p className="mt-[5mm]">ลงชื่อ <Fill w="48mm" center>{signedText}</Fill></p>
       <p>(<Fill w="48mm" center>{name}</Fill>)</p>
       {position && <p className="whitespace-nowrap text-[10.5pt]">{position}</p>}
-      {showDate && <p>วันที่ <Fill w="58mm" center>{date}</Fill></p>}
+      {showDate && <p className="whitespace-nowrap text-[10.5pt]">วันที่ <Fill w="64mm" center>{date}</Fill></p>}
       {children}
     </section>
   );

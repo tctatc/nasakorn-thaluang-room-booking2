@@ -45,7 +45,7 @@ export function CardHeader({
       )}
     >
       <div className="min-w-0">
-        <h2 className="text-[15px] font-semibold text-ink">{title}</h2>
+        <h2 className="text-base font-semibold text-ink">{title}</h2>
         {description !== undefined && (
           <p className="mt-0.5 text-sm text-ink-muted">{description}</p>
         )}

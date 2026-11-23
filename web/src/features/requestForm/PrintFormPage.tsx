@@ -53,7 +53,7 @@ export function PrintFormPage() {
             <label className="min-w-0 flex-1 basis-72">
               <span className="mb-1.5 block text-sm font-medium text-ink">คำขอที่จะแสดง</span>
               <select
-                className="min-h-11 w-full rounded-control border border-line bg-surface px-3 text-[15px]"
+                className="min-h-11 w-full rounded-control border border-line bg-surface px-3 text-base"
                 value={selected}
                 onChange={(event) => { setSelected(event.target.value); setSearchParams(event.target.value ? { booking: event.target.value } : {}); }}
               >

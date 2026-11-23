@@ -96,7 +96,7 @@ export function WeekTimeGrid({
     >
       <div className="min-w-[468px] sm:min-w-[900px]">
         <div ref={headerRef} className={`sticky top-0 z-20 grid ${columns} border-b border-line bg-surface`}>
-          <div data-time-col className="sticky left-0 z-10 flex items-end justify-center border-r border-line bg-surface pb-2 text-[10px] font-medium text-ink-subtle sm:text-[11px]">GMT+07</div>
+          <div data-time-col className="sticky left-0 z-10 flex items-end justify-center border-r border-line bg-surface pb-2 text-[11px] font-medium text-ink-subtle sm:text-xs">GMT+07</div>
           {dates.map((key) => {
             const date = dateFromKey(key);
             const weekday = new Intl.DateTimeFormat('th-TH', { weekday: 'long', timeZone: 'UTC' }).format(date);
@@ -127,7 +127,7 @@ export function WeekTimeGrid({
             {Array.from({ length: HOURS + 1 }, (_, index) => {
               const shift = index === 0 ? 'translate-y-0.5' : index === HOURS ? '-translate-y-full' : '-translate-y-1/2';
               return (
-                <div key={index} className={`absolute right-1.5 ${shift} text-[10px] font-medium tabular-nums text-ink-muted sm:right-2 sm:text-[11px]`} style={{ top: `${index * hourHeight}px` }}>
+                <div key={index} className={`absolute right-1.5 ${shift} text-[11px] font-medium tabular-nums text-ink-muted sm:right-2 sm:text-xs`} style={{ top: `${index * hourHeight}px` }}>
                   {String(index + 8).padStart(2, '0')}:00
                 </div>
               );
@@ -162,7 +162,7 @@ export function WeekTimeGrid({
                   // ชี้ตรงไหน เห็นเลยว่าจะได้ช่วงไหน (ยาว 1 ชั่วโมงตามค่าเริ่มต้นของหน้าต่างจอง)
                   <div
                     aria-hidden="true"
-                    className="pointer-events-none absolute inset-x-1 z-[5] flex items-start gap-1 overflow-hidden rounded-md border border-dashed border-ok-border bg-ok-soft/80 px-1.5 py-0.5 text-[11px] font-semibold text-ok sm:text-xs"
+                    className="pointer-events-none absolute inset-x-1 z-[5] flex items-start gap-1 overflow-hidden rounded-md border border-dashed border-ok-border bg-ok-soft/80 px-1.5 py-0.5 text-xs font-semibold text-ok sm:text-xs"
                     style={{ top: `${toY(ghost.startMin) + 1}px`, height: `${(Math.min(60, DAY_END - ghost.startMin) / 60) * hourHeight - 2}px` }}
                   >
                     <Plus className="mt-px size-3 shrink-0" strokeWidth={3} />
@@ -183,7 +183,7 @@ export function WeekTimeGrid({
                       onClick={(event) => { event.stopPropagation(); onDay(key); onOpenBooking(booking); }}
                       title={`${timeText(booking.startMin)}–${timeText(booking.endMin)} · ${booking.bookerName || booking.userName}${roomName ? ` · ${roomName}` : ''}${booking.status === 'pending' ? ' (รออนุมัติ)' : ''}`}
                       className={cn(
-                        'absolute z-10 overflow-hidden rounded-md py-1 text-left text-[11px] leading-tight shadow-sm ring-1 ring-inset focus-visible:outline-2 focus-visible:outline-brand sm:text-xs',
+                        'absolute z-10 overflow-hidden rounded-md py-1 text-left text-xs leading-tight shadow-sm ring-1 ring-inset focus-visible:outline-2 focus-visible:outline-brand sm:text-xs',
                         // แบ่งช่องกับรายการอื่นแล้วแคบลง ลดขอบในให้ยังเห็นเวลาเริ่มเต็ม ๆ
                         place.lanes > 1 ? 'px-1' : 'px-1.5 sm:px-2',
                         // สีประจำห้อง (ดูซ้อนกันได้ว่าห้องไหน) — รออนุมัติใช้กรอบเส้นประแทนสี
@@ -210,7 +210,7 @@ export function WeekTimeGrid({
                 {picked && (
                   <div
                     aria-hidden="true"
-                    className="pointer-events-none absolute inset-x-1 z-[12] overflow-hidden rounded-md bg-ok px-1.5 py-1 text-[11px] leading-tight text-ink-inverse shadow-raised ring-2 ring-ok ring-offset-1 ring-offset-surface sm:px-2 sm:text-xs"
+                    className="pointer-events-none absolute inset-x-1 z-[12] overflow-hidden rounded-md bg-ok px-1.5 py-1 text-xs leading-tight text-ink-inverse shadow-raised ring-2 ring-ok ring-offset-1 ring-offset-surface sm:px-2 sm:text-xs"
                     style={{ top: `${toY(Math.max(picked.startMin, DAY_START)) + 1}px`, height: `${Math.max(((Math.min(picked.endMin, DAY_END) - Math.max(picked.startMin, DAY_START)) / 60) * hourHeight - 2, 22)}px` }}
                   >
                     <span className="block truncate font-semibold tabular-nums">{timeText(picked.startMin)}–{timeText(picked.endMin)}</span>

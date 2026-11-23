@@ -62,7 +62,7 @@ export function DayTimeline({
           style={position(startMin, endMin)}
         />
       </div>
-      <div className="relative mt-1.5 h-4 text-[11px] tabular-nums text-ink-subtle">
+      <div className="relative mt-1.5 h-4 text-xs tabular-nums text-ink-subtle">
         {ticks.map((minute, index) => (
           <span
             key={minute}

@@ -8,6 +8,8 @@ import type { DemoBooking, DemoRoom } from './demo';
 import type { BookingRequest } from '@shared/schemas/booking';
 import type { BusySlot } from '@shared/domain/availability';
 import type { DaySlot } from '@shared/domain/room-status';
+import type { PublicSlot } from '@shared/domain/availability';
+import type { SystemSettings } from '@shared/schemas/settings';
 import type { Announcement, AnnouncementInput } from '@shared/schemas/announcement';
 import type { LookupInput, LookupItem } from '@shared/schemas/lookup';
 import type { RoomInput } from '@shared/schemas/room';
@@ -45,15 +47,25 @@ export interface ApiClient {
   /** เข้าสู่ระบบทาง ข: PIN อย่างเดียว */
   loginPin(pin: string): Promise<LoginResult>;
   me(token: string): Promise<{ user: SessionUser }>;
+  /* ---- ไม่ต้องเข้าสู่ระบบ (ผู้จองทั่วไป) ---- */
+  /** กฎการจองสำหรับฟอร์ม ก่อนเข้าสู่ระบบ */
+  publicBootstrap(): Promise<{ settings: SystemSettings; dataVersion: number; serverTime: string }>;
+  /** ปฏิทินสาธารณะ: แค่ห้อง วัน เวลา สถานะ (ไม่เกิน 62 วันต่อครั้ง) */
+  publicSchedule(from: string, to: string): Promise<{ slots: PublicSlot[] }>;
+  /** จองโดยไม่เข้าสู่ระบบ — website คือช่องดักบอท (คนจริงเว้นว่าง) */
+  guestBooking(input: BookingRequest & { website?: string }): Promise<{ booking: DemoBooking; trackingCode: string }>;
+  /** ดูคำขอด้วยรหัสติดตาม */
+  trackBooking(code: string): Promise<{ booking: DemoBooking; room: DemoRoom | null }>;
+  trackCancel(code: string, reason: string): Promise<{ booking: DemoBooking }>;
   bootstrap(token: string): Promise<BootstrapResult>;
   version(): Promise<VersionResult>;
   rooms(token: string): Promise<{ rooms: DemoRoom[] }>;
   bookings(token: string, from?: string, to?: string): Promise<{ bookings: DemoBooking[] }>;
-  /** ช่วงเวลาที่ห้องถูกจองไว้ในวันนั้น (ไม่มีชื่อ/หัวข้อของใคร ทุกคนดูได้) */
+  /** ช่วงเวลาที่ห้องถูกจองไว้ในวันนั้น (ไม่มีชื่อ/หัวข้อของใคร ทุกคนดูได้ ไม่ต้องล็อกอิน) */
   availability(token: string, roomId: string, dateKey: string): Promise<{ busy: BusySlot[] }>;
   /** ช่วงที่อนุมัติแล้วของทุกห้องวันนี้ (ไม่มีชื่อ/หัวข้อ) — สถานะห้องตอนนี้ในหน้าภาพรวม */
   roomSlotsToday(token: string): Promise<{ dateKey: string; slots: DaySlot[] }>;
-  createBooking(token: string, input: BookingRequest): Promise<{ booking: DemoBooking }>;
+  createBooking(token: string, input: BookingRequest): Promise<{ booking: DemoBooking; trackingCode: string }>;
   cancelBooking(token: string, bookingId: string, reason?: string): Promise<{ booking: DemoBooking }>;
   /** ลงนาม — ต้องแนบ PIN ของผู้ลงนามทุกครั้ง (แทนลายเซ็น) */
   decideBooking(token: string, bookingId: string, decision: 'approve'|'reject', pin: string, reason?: string): Promise<{ booking: DemoBooking }>;
@@ -92,6 +104,11 @@ function wrap(transport: Transport): ApiClient {
     login: (username, password) => transport.call('login', { username, password }),
     loginPin: (pin) => transport.call('loginPin', { pin }),
     me: (token) => transport.call('me', {}, token),
+    publicBootstrap: () => transport.call('publicBootstrap'),
+    publicSchedule: (from, to) => transport.call('publicSchedule', { from, to }),
+    guestBooking: (input) => announceBookingsChanged(transport.call('guestBooking', input)),
+    trackBooking: (code) => transport.call('trackBooking', { code }),
+    trackCancel: (code, reason) => announceBookingsChanged(transport.call('trackCancel', { code, reason })),
     bootstrap: (token) => transport.call('bootstrap', {}, token),
     version: () => transport.version(),
     rooms: (token) => transport.call('rooms', {}, token),

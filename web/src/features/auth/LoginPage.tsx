@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent, type RefObject } from 'react';
-import { Eye, EyeOff, KeyRound, LockKeyhole, UserRound } from 'lucide-react';
+import { Eye, EyeOff, KeyRound, LockKeyhole, UserRound, ArrowLeft } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useApp } from '../../app/providers/AppProvider';
 import { DEMO_LOGINS } from '../../lib/api/demo';
 import { USER_ROLE_LABEL_TH, PIN_LENGTH, PASSWORD_MAX_LENGTH } from '@shared/schemas/user';
@@ -95,8 +96,8 @@ export function LoginPage() {
           <p className="text-[2.5rem] font-semibold leading-[1.15] tracking-tight text-balance">
             จองห้อง ส่งคำขอ และอนุมัติ ครบในที่เดียว
           </p>
-          <ol className="mt-8 space-y-3 text-[15px] text-ink-inverse/80">
-            {['ผู้ขอใช้กรอกแบบฟอร์มคำขอในเว็บ', 'ผู้ลงนาม 3 ขั้นอนุมัติตามลำดับ', 'อนุมัติครบแล้วขึ้นปฏิทินให้ทุกคนเห็น'].map((text, index) => (
+          <ol className="mt-8 space-y-3 text-base text-ink-inverse/80">
+            {['ผู้ขอใช้กรอกแบบฟอร์มคำขอได้เลย ไม่ต้องมีบัญชี', 'ผู้ลงนาม 3 ขั้นอนุมัติตามลำดับ', 'ผู้ขอติดตามผลด้วยรหัสหรือ QR Code'].map((text, index) => (
               <li key={text} className="flex items-center gap-3">
                 <span className="grid size-7 shrink-0 place-items-center rounded-full bg-gold text-sm font-semibold text-panel">{index + 1}</span>
                 {text}
@@ -110,8 +111,11 @@ export function LoginPage() {
 
       <main className="flex items-start justify-center bg-canvas px-4 py-8 sm:items-center sm:px-6 lg:py-12">
         <div className="w-full max-w-sm">
+          <Link to="/" className="mb-6 inline-flex min-h-11 items-center gap-2 rounded-control text-base font-medium text-brand hover:underline">
+            <ArrowLeft className="size-5" aria-hidden="true" />กลับไปจองห้อง (ไม่ต้องเข้าสู่ระบบ)
+          </Link>
           <h1 className="text-2xl font-semibold tracking-tight text-ink">เข้าสู่ระบบ</h1>
-          <p className="mt-1 text-[15px] text-ink-muted">เลือกเข้าด้วยรหัสผ่าน หรือ PIN ที่ได้รับจากผู้ดูแลระบบ</p>
+          <p className="mt-1 text-base text-ink-muted">สำหรับเจ้าหน้าที่ หัวหน้างาน ผู้บริหาร และผู้ดูแลระบบ — ผู้ขอใช้ห้องจองได้เลยโดยไม่ต้องเข้าสู่ระบบ</p>
 
           <div role="tablist" aria-label="วิธีเข้าสู่ระบบ" className="mt-6 grid grid-cols-2 gap-1 rounded-control bg-neutral-soft p-1">
             {([

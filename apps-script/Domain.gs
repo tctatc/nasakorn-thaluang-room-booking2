@@ -35,6 +35,7 @@ var Domain = (() => {
     Check: () => Check,
     DATE_KEY_PATTERN: () => DATE_KEY_PATTERN,
     DEFAULT_SYSTEM_SETTINGS: () => DEFAULT_SYSTEM_SETTINGS,
+    GUEST_BOOKINGS_PER_HOUR: () => GUEST_BOOKINGS_PER_HOUR,
     LOCK_HOLDING_STATUSES: () => LOCK_HOLDING_STATUSES,
     LOOKUP_KEY_PATTERN: () => LOOKUP_KEY_PATTERN,
     LOOKUP_KINDS: () => LOOKUP_KINDS,
@@ -49,6 +50,7 @@ var Domain = (() => {
     PIN_LOGIN_FAILURE_LIMIT_PER_HOUR: () => PIN_LOGIN_FAILURE_LIMIT_PER_HOUR,
     PIN_MAX_FAILURES: () => PIN_MAX_FAILURES,
     PIN_TAKEN_MESSAGE: () => PIN_TAKEN_MESSAGE,
+    PUBLIC_SCHEDULE_MAX_DAYS: () => PUBLIC_SCHEDULE_MAX_DAYS,
     REPORT_COUNTED_STATUSES: () => REPORT_COUNTED_STATUSES,
     REQUEST_FACILITIES: () => REQUEST_FACILITIES,
     REQUEST_FACILITY_LABEL_TH: () => REQUEST_FACILITY_LABEL_TH,
@@ -73,6 +75,9 @@ var Domain = (() => {
     SHEET_SETTINGS: () => SHEET_SETTINGS,
     SHEET_SPECS: () => SHEET_SPECS,
     SHEET_USERS: () => SHEET_USERS,
+    TRACKING_ALPHABET: () => TRACKING_ALPHABET,
+    TRACKING_CODE_LENGTH: () => TRACKING_CODE_LENGTH,
+    TRACKING_MISSES_PER_HOUR: () => TRACKING_MISSES_PER_HOUR,
     USAGE_STATUSES: () => USAGE_STATUSES,
     USERNAME_PATTERN: () => USERNAME_PATTERN,
     USER_ROLES: () => USER_ROLES,
@@ -111,14 +116,19 @@ var Domain = (() => {
     findConflicts: () => findConflicts,
     findRowNumber: () => findRowNumber,
     formatTimeOfDay: () => formatTimeOfDay,
+    formatTrackingCode: () => formatTrackingCode,
     formatUtilization: () => formatUtilization,
     freeGaps: () => freeGaps,
+    freeWindows: () => freeWindows,
     fromDateKeyAndMinutes: () => fromDateKeyAndMinutes,
+    guestAccountId: () => guestAccountId,
+    guestRequesterIssues: () => guestRequesterIssues,
     holdsRoomLock: () => holdsRoomLock,
     isAwaitingRole: () => isAwaitingRole,
     isBookableRoomStatus: () => isBookableRoomStatus,
     isEndBlocked: () => isEndBlocked,
     isFinalStatus: () => isFinalStatus,
+    isGuestAccountId: () => isGuestAccountId,
     isOpenLocationRoom: () => isOpenLocationRoom,
     isStartBlocked: () => isStartBlocked,
     keyValueToObject: () => keyValueToObject,
@@ -131,6 +141,7 @@ var Domain = (() => {
     monthsBetween: () => monthsBetween,
     newLookupKey: () => newLookupKey,
     normalizeDateKey: () => normalizeDateKey,
+    normalizeTrackingCode: () => normalizeTrackingCode,
     normalizeUserRole: () => normalizeUserRole,
     normalizeUsername: () => normalizeUsername,
     objectToRow: () => objectToRow,
@@ -139,8 +150,10 @@ var Domain = (() => {
     parseTimeOfDay: () => parseTimeOfDay,
     passwordDigestMessage: () => passwordDigestMessage,
     passwordProblem: () => passwordProblem,
+    phoneDigits: () => phoneDigits,
     pinDigestMessage: () => pinDigestMessage,
     pinProblem: () => pinProblem,
+    publicSlotsBetween: () => publicSlotsBetween,
     readBoolean: () => readBoolean,
     readList: () => readList,
     readNumber: () => readNumber,
@@ -153,6 +166,7 @@ var Domain = (() => {
     rowsToObjects: () => rowsToObjects,
     rowsToSettings: () => rowsToSettings,
     sanitizeForSheet: () => sanitizeForSheet,
+    scheduleWindow: () => scheduleWindow,
     sessionExpiryFrom: () => sessionExpiryFrom,
     settingsToRows: () => settingsToRows,
     sheetSpec: () => sheetSpec,
@@ -162,6 +176,7 @@ var Domain = (() => {
     summarizeRoomRatings: () => summarizeRoomRatings,
     toDateKey: () => toDateKey,
     toMinutesOfDay: () => toMinutesOfDay,
+    trackingCodeFromBytes: () => trackingCodeFromBytes,
     tzOffsetMinutes: () => tzOffsetMinutes,
     unknownLookupKeys: () => unknownLookupKeys,
     validateAnnouncementInput: () => validateAnnouncementInput,
@@ -177,6 +192,7 @@ var Domain = (() => {
     validateResetPinInput: () => validateResetPinInput,
     validateReviewInput: () => validateReviewInput,
     validateRoomInput: () => validateRoomInput,
+    validateScheduleRange: () => validateScheduleRange,
     validateSystemSettings: () => validateSystemSettings,
     validateUserAccountInput: () => validateUserAccountInput,
     validateUserProfileInput: () => validateUserProfileInput,
@@ -617,7 +633,9 @@ var Domain = (() => {
         "approvalStep",
         "approvalLog",
         "customLocation",
-        "meetingType"
+        "meetingType",
+        // รหัสติดตามสถานะ (สุ่ม เดาไม่ได้) — ผู้จองทั่วไปใช้ดูสถานะ พิมพ์แบบฟอร์ม และยกเลิกคำขอของตัวเอง
+        "trackingCode"
       ]
     },
     {
@@ -1238,6 +1256,26 @@ var Domain = (() => {
   }
   function isEndBlocked(startMin, endMin, busy) {
     return conflictingSlots({ startMin, endMin }, busy).length > 0;
+  }
+  function freeWindows(busy, open, close) {
+    const windows = [];
+    let cursor = open;
+    for (const slot of [...busy].sort((a, b) => a.startMin - b.startMin)) {
+      if (slot.startMin > cursor) windows.push({ startMin: cursor, endMin: Math.min(slot.startMin, close) });
+      cursor = Math.max(cursor, slot.endMin);
+      if (cursor >= close) break;
+    }
+    if (cursor < close) windows.push({ startMin: cursor, endMin: close });
+    return windows.filter((window) => window.endMin > window.startMin);
+  }
+  function publicSlotsBetween(rows, from, to) {
+    return rows.map((row) => ({ row, dateKey: normalizeDateKey(row.dateKey), status: String(row.status) })).filter(({ dateKey, status }) => dateKey >= from && dateKey <= to && ["pending", "confirmed", "completed"].includes(status)).map(({ row, dateKey, status }) => ({
+      roomId: String(row.roomId),
+      dateKey,
+      startMin: Number(row.startMin),
+      endMin: Number(row.endMin),
+      status: status === "pending" ? "pending" : "confirmed"
+    })).filter((slot) => Number.isFinite(slot.startMin) && Number.isFinite(slot.endMin) && slot.endMin > slot.startMin).sort((a, b) => a.dateKey.localeCompare(b.dateKey) || a.startMin - b.startMin);
   }
 
   // shared/schemas/room.ts
@@ -1963,6 +2001,65 @@ var Domain = (() => {
     }
     const next = mine.find((slot) => slot.startMin > nowMin);
     return { kind: "free", nextStartMin: (_a = next == null ? void 0 : next.startMin) != null ? _a : null };
+  }
+
+  // shared/schemas/guest.ts
+  var TRACKING_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+  var TRACKING_CODE_LENGTH = 10;
+  var TRACKING_PATTERN = new RegExp(`^[${TRACKING_ALPHABET}]{${TRACKING_CODE_LENGTH}}$`);
+  var GUEST_BOOKINGS_PER_HOUR = 40;
+  var TRACKING_MISSES_PER_HOUR = 300;
+  var PUBLIC_SCHEDULE_MAX_DAYS = 62;
+  function trackingCodeFromBytes(bytes) {
+    var _a;
+    const limit = Math.floor(256 / TRACKING_ALPHABET.length) * TRACKING_ALPHABET.length;
+    let code = "";
+    for (let i = 0; i < bytes.length && code.length < TRACKING_CODE_LENGTH; i += 1) {
+      const byte = ((_a = bytes[i]) != null ? _a : 0) & 255;
+      if (byte < limit) code += TRACKING_ALPHABET[byte % TRACKING_ALPHABET.length];
+    }
+    if (code.length < TRACKING_CODE_LENGTH) throw new Error("\u0E44\u0E1A\u0E15\u0E4C\u0E2A\u0E38\u0E48\u0E21\u0E44\u0E21\u0E48\u0E1E\u0E2D\u0E2A\u0E23\u0E49\u0E32\u0E07\u0E23\u0E2B\u0E31\u0E2A\u0E15\u0E34\u0E14\u0E15\u0E32\u0E21");
+    return code;
+  }
+  function normalizeTrackingCode(raw) {
+    const code = String(raw != null ? raw : "").toUpperCase().replace(/[\s-]/g, "");
+    return TRACKING_PATTERN.test(code) ? code : "";
+  }
+  function formatTrackingCode(code) {
+    return code.length === TRACKING_CODE_LENGTH ? `${code.slice(0, 5)}-${code.slice(5)}` : code;
+  }
+  function phoneDigits(phone) {
+    return phone.replace(/\D/g, "");
+  }
+  function guestAccountId(phone) {
+    return `guest:${phoneDigits(phone)}`;
+  }
+  function isGuestAccountId(id) {
+    return id.startsWith("guest:");
+  }
+  function guestRequesterIssues(input) {
+    const issues = [];
+    if (input.bookerName.trim().length < 2) issues.push({ field: "bookerName", message: "\u0E01\u0E23\u0E38\u0E13\u0E32\u0E01\u0E23\u0E2D\u0E01\u0E0A\u0E37\u0E48\u0E2D-\u0E19\u0E32\u0E21\u0E2A\u0E01\u0E38\u0E25\u0E1C\u0E39\u0E49\u0E08\u0E2D\u0E07" });
+    const digits = phoneDigits(input.requesterPhone);
+    if (digits.length < 9 || digits.length > 10) {
+      issues.push({ field: "requesterPhone", message: "\u0E01\u0E23\u0E38\u0E13\u0E32\u0E01\u0E23\u0E2D\u0E01\u0E40\u0E1A\u0E2D\u0E23\u0E4C\u0E42\u0E17\u0E23\u0E17\u0E35\u0E48\u0E15\u0E34\u0E14\u0E15\u0E48\u0E2D\u0E01\u0E25\u0E31\u0E1A\u0E44\u0E14\u0E49 9\u201310 \u0E2B\u0E25\u0E31\u0E01 \u0E40\u0E0A\u0E48\u0E19 081-234-5678" });
+    }
+    if (input.department.trim() === "") issues.push({ field: "department", message: "\u0E01\u0E23\u0E38\u0E13\u0E32\u0E01\u0E23\u0E2D\u0E01\u0E41\u0E1C\u0E19\u0E01 / \u0E2B\u0E19\u0E48\u0E27\u0E22\u0E07\u0E32\u0E19" });
+    return issues;
+  }
+  function validateScheduleRange(raw) {
+    const input = asRecord(raw);
+    const check = new Check();
+    const from = check.string("from", input.from, { label: "\u0E27\u0E31\u0E19\u0E40\u0E23\u0E34\u0E48\u0E21", pattern: DATE_KEY_PATTERN });
+    const to = check.string("to", input.to, { label: "\u0E27\u0E31\u0E19\u0E2A\u0E34\u0E49\u0E19\u0E2A\u0E38\u0E14", pattern: DATE_KEY_PATTERN });
+    if (check.ok) {
+      if (to < from) check.fail("to", "\u0E27\u0E31\u0E19\u0E2A\u0E34\u0E49\u0E19\u0E2A\u0E38\u0E14\u0E15\u0E49\u0E2D\u0E07\u0E44\u0E21\u0E48\u0E01\u0E48\u0E2D\u0E19\u0E27\u0E31\u0E19\u0E40\u0E23\u0E34\u0E48\u0E21");
+      else if (countDaysInclusive(from, to) > PUBLIC_SCHEDULE_MAX_DAYS) check.fail("to", `\u0E14\u0E39\u0E44\u0E14\u0E49\u0E04\u0E23\u0E31\u0E49\u0E07\u0E25\u0E30\u0E44\u0E21\u0E48\u0E40\u0E01\u0E34\u0E19 ${PUBLIC_SCHEDULE_MAX_DAYS} \u0E27\u0E31\u0E19`);
+    }
+    return check.result({ from, to });
+  }
+  function scheduleWindow(from, days) {
+    return { from, to: addDaysToDateKey(from, Math.max(1, Math.min(days, PUBLIC_SCHEDULE_MAX_DAYS)) - 1) };
   }
   return __toCommonJS(index_exports);
 })();

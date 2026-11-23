@@ -29,6 +29,7 @@ import { BOOKINGS_CHANGED_EVENT } from '../../lib/api/client';
 import { AnnouncementsPanel } from './AnnouncementsPanel';
 import { DepartmentRanking } from './DepartmentRanking';
 import { RoomStatusNow } from './RoomStatusNow';
+import { AvailabilityBoard } from '../schedule/AvailabilityBoard';
 
 const WEEKDAY_LABELS = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
 
@@ -109,7 +110,7 @@ export function DashboardPage() {
         <div className="relative flex flex-wrap items-center justify-between gap-4">
           <div className="min-w-0">
             <h1 className="text-xl font-semibold sm:text-2xl">ระบบจองห้องประชุมออนไลน์</h1>
-            <p className="mt-1 text-sm text-white/85 sm:text-[15px]">{formatFullDate(today)}<span className="hidden sm:inline"> · </span><br className="sm:hidden" />วันนี้มีการใช้ห้อง {todayCount} รายการ</p>
+            <p className="mt-1 text-sm text-white/85 sm:text-base">{formatFullDate(today)}<span className="hidden sm:inline"> · </span><br className="sm:hidden" />วันนี้มีการใช้ห้อง {todayCount} รายการ</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {!isDemo && (
@@ -125,7 +126,7 @@ export function DashboardPage() {
             )}
             <Link
               to="/book"
-              className="hidden min-h-11 items-center gap-2 rounded-control bg-white px-4 text-[15px] font-semibold text-brand lg:inline-flex shadow-card transition-transform duration-150 motion-safe:active:scale-[0.98] focus-visible:outline-white"
+              className="hidden min-h-11 items-center gap-2 rounded-control bg-white px-4 text-base font-semibold text-brand lg:inline-flex shadow-card transition-transform duration-150 motion-safe:active:scale-[0.98] focus-visible:outline-white"
             >
               <CalendarPlus className="size-4" aria-hidden="true" />
               จองห้องประชุม
@@ -160,6 +161,9 @@ export function DashboardPage() {
       </section>
 
       <RoomStatusNow rooms={rooms} refreshKey={refreshKey} />
+
+      {/* ปฏิทินห้องว่าง + ตรวจการจองซ้ำ — วางแผนก่อนจองโดยไม่ชนกับคนอื่น */}
+      <div className="mb-5"><AvailabilityBoard rooms={rooms} settings={settings} /></div>
 
       {/* ประกาศอยู่ใต้กราฟ เพื่อให้เปิดหน้ามาแล้วเห็นกราฟทันที */}
       <AnnouncementsPanel refreshKey={refreshKey} />
@@ -209,7 +213,7 @@ export function DashboardPage() {
           <details open={isDesktop} className="group">
           <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 [&::-webkit-details-marker]:hidden">
             <span className="min-w-0">
-              <span className="block text-[15px] font-semibold text-ink">กฎการจองที่ใช้อยู่</span>
+              <span className="block text-base font-semibold text-ink">กฎการจองที่ใช้อยู่</span>
               <span className="mt-0.5 block text-sm text-ink-muted">ค่าทั้งหมดนี้อ่านจากการตั้งค่าในระบบ ผู้ดูแลแก้ได้ภายหลัง</span>
             </span>
             <ChevronDown className="size-5 shrink-0 text-ink-subtle transition-transform duration-200 group-open:rotate-180" aria-hidden="true" />
@@ -291,7 +295,7 @@ function RoomBar({name,count,percent,color,index}:{name:string;count:number;perc
         <div className="absolute inset-y-0 left-0 w-1.5 bg-white/25"/>
       </div>
     </div>
-    <span className="line-clamp-2 h-8 w-full shrink-0 text-center text-[11px] leading-4 text-ink-muted transition-colors duration-200 group-hover/bar:font-semibold group-hover/bar:text-ink">{name}</span>
+    <span className="line-clamp-2 h-8 w-full shrink-0 text-center text-xs leading-4 text-ink-muted transition-colors duration-200 group-hover/bar:font-semibold group-hover/bar:text-ink">{name}</span>
   </div>;
 }
 

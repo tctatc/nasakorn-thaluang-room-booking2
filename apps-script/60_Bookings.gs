@@ -16,8 +16,14 @@ function listRooms_(user) {
   }) };
 }
 
-function publicBooking_(row) {
+/**
+ * viewer: ผู้ที่จะเห็นข้อมูลนี้ — รหัสติดตามเป็นกุญแจของคำขอ ส่งให้เฉพาะเจ้าของและผู้ดูแลเท่านั้น
+ * (ผู้ลงนามเห็นรายการทุกคนแต่ไม่ต้องได้รหัสของคนอื่น)
+ */
+function publicBooking_(row, viewer) {
+  const ownsCode = viewer === 'owner' || (viewer && (viewer.role === 'admin' || viewer.email === String(row.userEmail)));
   return {
+    trackingCode: ownsCode ? String(row.trackingCode || '') : '',
     bookingId: String(row.bookingId), roomId: String(row.roomId), dateKey: Domain.normalizeDateKey(row.dateKey),
     startMin: Number(row.startMin), endMin: Number(row.endMin), status: String(row.status),
     title: String(row.title || ''), bookerName: String(row.bookerName || row.userName),
@@ -43,7 +49,7 @@ function listBookings_(user, payload) {
   return { bookings: rows.filter(function (row) {
     return (Domain.canSeeAllBookings(user.role) || String(row.userEmail) === user.email) &&
       (!from || Domain.normalizeDateKey(row.dateKey) >= from) && (!to || Domain.normalizeDateKey(row.dateKey) <= to);
-  }).map(publicBooking_) };
+  }).map(function (row) { return publicBooking_(row, user); }) };
 }
 
 /**
@@ -63,7 +69,14 @@ function roomAvailability_(user, raw) {
 function createBooking_(user, raw) {
   const parsed = Domain.validateBookingRequest(raw);
   if (!parsed.ok) throw appError_(ERROR_CODES.VALIDATION, 'ข้อมูลการจองไม่ถูกต้อง', parsed.issues);
-  const input = parsed.value;
+  return createBookingAs_(user, parsed.value);
+}
+
+/**
+ * บันทึกการจองในนามของ actor — ผู้ใช้ที่ล็อกอิน หรือผู้จองทั่วไป (role 'guest', ดู 65_Public.gs)
+ * ตัดสินห้องว่าง/กฎการจองภายในล็อกเสมอ ไม่ว่าใครจอง
+ */
+function createBookingAs_(user, input) {
   if (!input.termsAccepted) throw appError_(ERROR_CODES.VALIDATION, 'กรุณายอมรับเงื่อนไขการใช้ห้องประชุม');
   const lookups = readLookups_();
   if (Domain.unknownLookupKeys(lookups, 'facility', input.requestedFacilities).length > 0) {
@@ -117,11 +130,12 @@ function createBooking_(user, raw) {
       startAt: Domain.fromDateKeyAndMinutes(input.dateKey, input.startMin).toISOString(),
       endAt: Domain.fromDateKeyAndMinutes(input.dateKey, input.endMin).toISOString(),
       createdBy: user.email, createdAt: now, updatedBy: user.email, updatedAt: now,
+      trackingCode: newTrackingCode_(),
     };
     appendObject_(Domain.SHEET_BOOKINGS, booking);
     audit_(user.email, 'booking.create', 'booking', booking.bookingId, { roomId: room.roomId, dateKey: input.dateKey });
     bumpDataVersion_();
-    return { booking: publicBooking_(booking) };
+    return { booking: publicBooking_(booking, 'owner'), trackingCode: booking.trackingCode };
   });
 }
 
@@ -147,7 +161,7 @@ function cancelBooking_(user, payload) {
     });
     audit_(user.email, 'booking.cancel', 'booking', payload.bookingId, { reason: String(payload.reason || '') });
     bumpDataVersion_();
-    return { booking: publicBooking_(Object.assign({}, row, { status: 'cancelled' })) };
+    return { booking: publicBooking_(Object.assign({}, row, { status: 'cancelled' }), user) };
   });
 }
 
@@ -187,7 +201,7 @@ function decideBooking_(user, raw) {
     updateByKey_(Domain.SHEET_BOOKINGS, input.bookingId, patch);
     audit_(user.email, `booking.step${state.approvalStep}.${input.decision}`, 'booking', input.bookingId, { reason: input.reason });
     bumpDataVersion_();
-    return { booking: publicBooking_(Object.assign({}, row, patch)), nextStep: result.nextStep };
+    return { booking: publicBooking_(Object.assign({}, row, patch), user), nextStep: result.nextStep };
   });
 }
 

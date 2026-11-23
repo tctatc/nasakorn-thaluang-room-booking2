@@ -15,7 +15,7 @@ const VARIANTS: Record<Variant, string> = {
 const SIZES: Record<Size, string> = {
   // ความสูงขั้นต่ำ 44px ตามเกณฑ์พื้นที่กดบนมือถือ ยกเว้น sm ที่ใช้ในแถวตารางบนจอใหญ่
   sm: 'min-h-9 px-3 text-sm gap-1.5',
-  md: 'min-h-11 px-4 text-[15px] gap-2',
+  md: 'min-h-11 px-4 text-base gap-2',
   lg: 'min-h-12 px-6 text-base gap-2',
 };
 

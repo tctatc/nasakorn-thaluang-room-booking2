@@ -79,6 +79,12 @@ function apiHandlers_() {
     ping: function () {
       return { pong: true, serverTime: nowIso_() };
     },
+    // ไม่ต้องล็อกอิน — ผู้จองทั่วไป (ดูกติกาความปลอดภัยใน 65_Public.gs)
+    publicBootstrap: function () { return publicBootstrap_(); },
+    publicSchedule: function (payload) { return publicSchedule_(payload || {}); },
+    guestBooking: function (payload) { return guestBooking_(payload || {}); },
+    trackBooking: function (payload) { return trackBooking_(payload || {}); },
+    trackCancel: function (payload) { return trackCancel_(payload || {}); },
     login: function (payload) {
       return login_(payload || {});
     },
@@ -99,10 +105,12 @@ function apiHandlers_() {
         serverTime: nowIso_(),
       };
     },
-    rooms: function (payload, token) { return listRooms_(authenticate_(token)); },
+    // ไม่มี token = ผู้จองทั่วไป เห็นห้องทั้งหมด / มี token = ตรวจสิทธิ์ห้องรายบุคคลตามเดิม
+    rooms: function (payload, token) { return token ? listRooms_(authenticate_(token)) : publicRooms_(); },
     bookings: function (payload, token) { return listBookings_(authenticate_(token), payload || {}); },
-    roomSlotsToday: function (payload, token) { authenticate_(token); return roomSlotsToday_(); },
-    availability: function (payload, token) { return roomAvailability_(authenticate_(token), payload || {}); },
+    roomSlotsToday: function () { return roomSlotsToday_(); },
+    // ช่วงเวลาที่ไม่ว่าง (ไม่มีชื่อ/หัวข้อ) — ฟอร์มจองของผู้จองทั่วไปต้องใช้ จึงไม่ต้องล็อกอิน
+    availability: function (payload) { return roomAvailability_(null, payload || {}); },
     createBooking: function (payload, token) { return createBooking_(authenticate_(token), payload); },
     cancelBooking: function (payload, token) { return cancelBooking_(authenticate_(token), payload || {}); },
     // ผู้ลงนามแต่ละขั้น (ไม่ใช่ admin) — decideBooking_ ตรวจว่าเป็นขั้นของคนนี้หรือไม่
@@ -117,7 +125,11 @@ function apiHandlers_() {
     submitReview: function (payload, token) { return submitReview_(authenticate_(token), payload || {}); },
 
     // ข้อมูลตั้งต้นและห้องประชุม — ทุกคนอ่านได้ แก้ได้เฉพาะผู้ดูแล
-    lookups: function (payload, token) { authenticate_(token); return listLookups_(); },
+    // ผู้จองทั่วไปได้รายการตัวเลือกแต่ไม่ได้หมายเหตุ (เช่นชื่อหัวหน้าแผนก) — ไม่จำเป็นต่อการจอง
+    lookups: function (payload, token) {
+      if (token) { authenticate_(token); return listLookups_(); }
+      return { lookups: listLookups_().lookups.map(function (item) { return Object.assign({}, item, { note: '' }); }) };
+    },
     saveLookup: function (payload, token) { return saveLookup_(requireAdmin_(token), payload || {}); },
     archiveLookup: function (payload, token) { return archiveLookup_(requireAdmin_(token), payload || {}); },
     saveRoom: function (payload, token) { return saveRoom_(requireAdmin_(token), payload || {}); },

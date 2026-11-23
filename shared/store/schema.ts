@@ -138,6 +138,8 @@ export const SHEET_SPECS: SheetSpec[] = [
       'approvalLog',
       'customLocation',
       'meetingType',
+      // รหัสติดตามสถานะ (สุ่ม เดาไม่ได้) — ผู้จองทั่วไปใช้ดูสถานะ พิมพ์แบบฟอร์ม และยกเลิกคำขอของตัวเอง
+      'trackingCode',
     ],
   },
   {

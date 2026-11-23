@@ -76,7 +76,7 @@ export function AnnouncementsPanel({ refreshKey }: { refreshKey: number }) {
           <Megaphone className="size-[18px]" />
         </span>
         <div className="min-w-0 flex-1">
-          <h2 id="announcements-title" className="text-[15px] font-semibold text-ink">ประกาศจากงานศูนย์ดิจิทัลฯ</h2>
+          <h2 id="announcements-title" className="text-base font-semibold text-ink">ประกาศจากงานศูนย์ดิจิทัลฯ</h2>
           <p className="text-sm text-ink-muted">สถานะห้องประชุมและข่าวสารการใช้ห้อง</p>
         </div>
         {isAdmin && draft === null && (
@@ -91,11 +91,11 @@ export function AnnouncementsPanel({ refreshKey }: { refreshKey: number }) {
           {error && <p role="alert" className="text-sm font-medium text-danger">{error}</p>}
           <div>
             <label htmlFor="announcement-title" className="mb-1.5 block text-sm font-medium text-ink">หัวข้อประกาศ</label>
-            <input id="announcement-title" autoFocus required maxLength={120} value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} placeholder="เช่น ห้องประชุมใหญ่ปิดปรับปรุง 5–7 พ.ย." className="min-h-11 w-full rounded-control border border-line bg-surface px-3 text-[15px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/20" />
+            <input id="announcement-title" autoFocus required maxLength={120} value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} placeholder="เช่น ห้องประชุมใหญ่ปิดปรับปรุง 5–7 พ.ย." className="min-h-11 w-full rounded-control border border-line bg-surface px-3 text-base outline-none focus:border-brand focus:ring-2 focus:ring-brand/20" />
           </div>
           <div>
             <label htmlFor="announcement-body" className="mb-1.5 block text-sm font-medium text-ink">รายละเอียด <span className="font-normal text-ink-subtle">(ถ้ามี)</span></label>
-            <textarea id="announcement-body" maxLength={1000} value={draft.body} onChange={(e) => setDraft({ ...draft, body: e.target.value })} className="min-h-20 w-full rounded-control border border-line bg-surface px-3 py-2 text-[15px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/20" />
+            <textarea id="announcement-body" maxLength={1000} value={draft.body} onChange={(e) => setDraft({ ...draft, body: e.target.value })} className="min-h-20 w-full rounded-control border border-line bg-surface px-3 py-2 text-base outline-none focus:border-brand focus:ring-2 focus:ring-brand/20" />
           </div>
           <div className="flex flex-wrap items-end gap-3">
             <fieldset className="min-w-0">

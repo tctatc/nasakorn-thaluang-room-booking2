@@ -20,3 +20,4 @@ export * from './schemas/lookup';
 export * from './schemas/review';
 export * from './domain/report';
 export * from './domain/room-status';
+export * from './schemas/guest';

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { ArrowDown, ArrowUp, DoorOpen, ImagePlus, Pencil, Plus, Trash2 } from 'lucide-react';
+import { useSearchParams, Link } from 'react-router-dom';
+import { ArrowDown, ArrowUp, DoorOpen, ImagePlus, Pencil, Plus, Trash2, QrCode as QrCodeIcon } from 'lucide-react';
 import {
   LOOKUP_KINDS, LOOKUP_KIND_LABEL_TH, LOOKUP_NOTE_LABEL_TH, sortLookups, type LookupItem, type LookupKind,
 } from '@shared/schemas/lookup';
@@ -19,7 +19,7 @@ import { cn } from '../../lib/cn';
 import { useLookups } from '../../lib/hooks/useLookups';
 import { shrinkImage } from '../../lib/image/shrinkImage';
 
-const inputClass = 'min-h-11 w-full rounded-control border border-line bg-surface px-3 text-[15px] text-ink outline-none transition-colors duration-150 focus:border-brand focus:ring-2 focus:ring-brand/20';
+const inputClass = 'min-h-11 w-full rounded-control border border-line bg-surface px-3 text-base text-ink outline-none transition-colors duration-150 focus:border-brand focus:ring-2 focus:ring-brand/20';
 const labelClass = 'mb-1.5 block text-sm font-medium text-ink';
 
 type Tab = 'rooms' | LookupKind;
@@ -58,7 +58,11 @@ export function ManagePage() {
 
   return (
     <>
-      <PageHeader title="ตั้งค่าข้อมูล" description="เพิ่ม แก้ไข หรือปิดรายการที่ใช้ในระบบได้เอง มีผลกับทุกคนทันที" />
+      <PageHeader
+        title="ตั้งค่าข้อมูล"
+        description="เพิ่ม แก้ไข หรือปิดรายการที่ใช้ในระบบได้เอง มีผลกับทุกคนทันที"
+        action={<Link to="/qr" className="inline-flex min-h-11 items-center gap-2 rounded-control px-4 font-medium text-brand ring-1 ring-brand-border transition-colors hover:bg-brand-soft"><QrCodeIcon className="size-4" aria-hidden="true" />พิมพ์ QR หน้าจองห้อง</Link>}
+      />
       <div role="tablist" aria-label="ชนิดข้อมูล" className="-mx-4 mb-5 flex gap-1.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
         {TABS.map((item, index) => (
           <button

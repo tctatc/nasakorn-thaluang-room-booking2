@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   AirVent, CalendarDays, Check, Clock3, DoorOpen, FileText, MapPin, Mic, Package, Projector, Send, Users, Volume2, Wifi, type LucideIcon,
 } from 'lucide-react';
@@ -10,7 +10,8 @@ import { isOpenLocationRoom } from '@shared/schemas/room';
 import type { RequestFacility } from '@shared/schemas/booking';
 import { useLookups } from '../../lib/hooks/useLookups';
 import type { SystemSettings } from '@shared/schemas/settings';
-import { useApp, useCurrentUser } from '../../app/providers/AppProvider';
+import { useApp } from '../../app/providers/AppProvider';
+import { rememberTracking } from '../track/trackingMemory';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { Alert } from '../../components/ui/Alert';
@@ -24,7 +25,7 @@ import { ROOM_BANDS } from './roomBands';
 import { FormPreviewDialog } from '../requestForm/FormPreviewDialog';
 import { adjustEndTime, asMinute, endTimeOptions, firstFreeStart, startTimeOptions, timeText } from './timeOptions';
 
-const inputClass = 'min-h-11 w-full rounded-control border border-line bg-surface px-3 text-[15px] text-ink outline-none transition-colors duration-150 focus:border-brand focus:ring-2 focus:ring-brand/20';
+const inputClass = 'min-h-11 w-full rounded-control border border-line bg-surface px-3 text-base text-ink outline-none transition-colors duration-150 focus:border-brand focus:ring-2 focus:ring-brand/20';
 const labelClass = 'mb-1.5 block text-sm font-medium text-ink';
 
 /** ไอคอนของอุปกรณ์ชุดเริ่มต้น — รายการที่ผู้ดูแลเพิ่มเองใช้ไอคอนกล่อง */
@@ -56,8 +57,8 @@ const durationText = (minutes: number) =>
 const thaiDate = (key: string, options: Intl.DateTimeFormatOptions) =>
   new Intl.DateTimeFormat('th-TH', { ...options, timeZone: 'Asia/Bangkok' }).format(new Date(`${key}T12:00:00+07:00`));
 
-/** วันที่จองได้ 7 วันถัดไป (ข้ามวันที่ไม่เปิดจอง และข้ามวันนี้ถ้าเลยเวลาที่ยังจองทัน) */
-function upcomingBookableDays(today: string, nowMinute: number, settings: SystemSettings, count = 7): string[] {
+/** วันที่จองได้ 14 วันถัดไป (ข้ามวันที่ไม่เปิดจอง และข้ามวันนี้ถ้าเลยเวลาที่ยังจองทัน) */
+function upcomingBookableDays(today: string, nowMinute: number, settings: SystemSettings, count = 14): string[] {
   const { endMin } = businessWindow(settings);
   const days: string[] = [];
   for (let offset = 0; days.length < count && offset < 31; offset += 1) {
@@ -70,10 +71,12 @@ function upcomingBookableDays(today: string, nowMinute: number, settings: System
 }
 
 export function BookingPage() {
-  const { api, token, settings } = useApp();
+  const { api, token, settings, user } = useApp();
   const rules = settings!;
-  const user = useCurrentUser();
   const nav = useNavigate();
+  // ลิงก์จากปฏิทิน/หน้าห้อง: ?room=&date=&start=&end= เลือกให้ล่วงหน้า
+  const [params] = useSearchParams();
+  const isTime = (value: string | null) => value !== null && /^\d{2}:\d{2}$/.test(value);
 
   const today = toDateKey(new Date());
   const nowMinute = toMinutesOfDay(new Date());
@@ -83,19 +86,21 @@ export function BookingPage() {
   const [roomOrder, setRoomOrder] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [roomId, setRoomId] = useState(() => new URLSearchParams(window.location.search).get('room') || '');
-  const [dateKey, setDateKey] = useState(days[0] ?? today);
-  const [start, setStart] = useState('09:00');
-  const [end, setEnd] = useState('10:00');
+  const [roomId, setRoomId] = useState(() => params.get('room') || '');
+  const [dateKey, setDateKey] = useState(() => (days.includes(params.get('date') ?? '') ? params.get('date')! : days[0] ?? today));
+  const [start, setStart] = useState(() => (isTime(params.get('start')) ? params.get('start')! : '09:00'));
+  const [end, setEnd] = useState(() => (isTime(params.get('end')) ? params.get('end')! : '10:00'));
+  // ช่องดักบอท — ซ่อนจากคนจริง ถ้ามีค่าเซิร์ฟเวอร์จะปฏิเสธ
+  const [website, setWebsite] = useState('');
   const [namePrefix, setNamePrefix] = useState('นาย');
   const [bookerName, setBookerName] = useState('');
   const [previewOpen, setPreviewOpen] = useState(false);
   const closePreview = useCallback(() => setPreviewOpen(false), []);
   const lookups = useLookups();
   // ตำแหน่งและหน่วยงานเติมจากบัญชีผู้ใช้ — แก้ได้ถ้าจองแทนคนอื่น
-  const [position, setPosition] = useState(user.position);
+  const [position, setPosition] = useState(user?.position ?? '');
   const [meetingType, setMeetingType] = useState('');
-  const [department, setDepartment] = useState(user.department);
+  const [department, setDepartment] = useState(user?.department ?? '');
   const [phone, setPhone] = useState('');
   const [title, setTitle] = useState('');
   const [customLocation, setCustomLocation] = useState('');
@@ -105,8 +110,8 @@ export function BookingPage() {
   const [extraFurnitureCount, setExtraFurnitureCount] = useState('0');
   const [otherFacility, setOtherFacility] = useState('');
   const [termsAccepted, setTermsAccepted] = useState(false);
-  // ผู้ใช้เลือกเวลาเองแล้ว ห้ามระบบเลื่อนให้อีก
-  const timeTouched = useRef(false);
+  // ผู้ใช้เลือกเวลาเองแล้ว (หรือมากับลิงก์จากปฏิทิน) ห้ามระบบเลื่อนให้อีก
+  const timeTouched = useRef(isTime(params.get('start')) && isTime(params.get('end')));
 
   useEffect(() => {
     api.rooms(token).then(({ rooms: data }) => {
@@ -180,12 +185,15 @@ export function BookingPage() {
     setBusy(true);
     setError('');
     try {
-      await api.createBooking(token, {
+      const request = {
         bookerName: fullName, title, roomId, dateKey, startMin, endMin, attendees: attendeeCount,
         department, requesterPosition: position, requesterPhone: phone, note, equipment: [], customLocation: openLocation ? customLocation : '',
         requestedFacilities, extraFurnitureCount: Number(extraFurnitureCount), otherFacility, termsAccepted, meetingType,
-      });
-      nav('/my-bookings', { state: { success: 'ส่งคำขอจองเรียบร้อยแล้ว' } });
+      };
+      // ไม่ได้เข้าสู่ระบบ = ผู้จองทั่วไป (กรอกชื่อ เบอร์ แผนก) ได้รหัสติดตามไว้ดูสถานะ
+      const { trackingCode } = user ? await api.createBooking(token, request) : await api.guestBooking({ ...request, website });
+      rememberTracking({ code: trackingCode, title, dateKey, startMin, endMin, roomId });
+      nav(`/track/${trackingCode}`, { state: { justBooked: true } });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ');
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -200,6 +208,18 @@ export function BookingPage() {
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
         <form id="booking-form" className="enter-stagger min-w-0 space-y-5" onSubmit={submit}>
           {error && <Alert tone="danger" title="จองไม่สำเร็จ">{error}</Alert>}
+          {!user && (
+            <Alert tone="info" title="จองได้เลย ไม่ต้องเข้าสู่ระบบ">
+              กรอกชื่อ เบอร์โทร และแผนกให้ครบ ส่งแล้วจะได้รหัสติดตามกับ QR Code ไว้ดูผลอนุมัติและพิมพ์แบบฟอร์ม
+            </Alert>
+          )}
+          {/* ช่องดักบอท: ซ่อนจากสายตาและโปรแกรมอ่านหน้าจอ คนจริงจะไม่กรอก */}
+          {!user && (
+            <div aria-hidden="true" className="absolute -left-[9999px] size-px overflow-hidden">
+              <label htmlFor="booking-website">เว็บไซต์</label>
+              <input id="booking-website" tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} />
+            </div>
+          )}
 
           <Section step={1} title="เลือกห้อง" hint="แตะการ์ดห้องที่ต้องการ" done={done.room}>
             <fieldset className="min-w-0">
@@ -264,7 +284,7 @@ export function BookingPage() {
                   >
                     <span className={cn('text-xs', selected ? 'text-ink-inverse/85' : 'text-ink-muted')}>{label}</span>
                     <span className="text-xl font-semibold leading-7 tabular-nums">{thaiDate(key, { day: 'numeric' })}</span>
-                    <span className={cn('text-[11px]', selected ? 'text-ink-inverse/85' : 'text-ink-subtle')}>{thaiDate(key, { month: 'short' })}</span>
+                    <span className={cn('text-xs', selected ? 'text-ink-inverse/85' : 'text-ink-subtle')}>{thaiDate(key, { month: 'short' })}</span>
                   </button>
                 );
               })}
@@ -444,7 +464,7 @@ export function BookingPage() {
           <button
             type="button"
             onClick={() => setPreviewOpen(true)}
-            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-card border border-dashed border-brand-border bg-brand-soft/60 px-4 text-[15px] font-medium text-brand transition-colors hover:bg-brand-soft"
+            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-card border border-dashed border-brand-border bg-brand-soft/60 px-4 text-base font-medium text-brand transition-colors hover:bg-brand-soft"
           >
             <FileText className="size-5" aria-hidden="true" />
             ดูตัวอย่างแบบฟอร์มคำขอที่จะพิมพ์ออกมา

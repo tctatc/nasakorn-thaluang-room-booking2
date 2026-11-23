@@ -48,8 +48,8 @@ export function TopNav({ role, badges }: { role: UserRole; badges: Record<string
                   title={item.label}
                   aria-label={badge > 0 ? `${item.label} (มี ${badge} รายการ)` : item.label}
                   className={({ isActive }) => cn(
-                    'relative flex min-h-14 w-full flex-col items-center justify-center gap-1 whitespace-nowrap rounded-2xl px-1.5 text-[13px] font-medium',
-                    'xl:min-h-12 xl:flex-row xl:gap-1.5 xl:rounded-pill xl:px-2 xl:text-sm 2xl:gap-2 2xl:px-4 2xl:text-[15px]',
+                    'relative flex min-h-14 w-full flex-col items-center justify-center gap-1 whitespace-nowrap rounded-2xl px-1.5 text-sm font-medium',
+                    'xl:min-h-12 xl:flex-row xl:gap-1.5 xl:rounded-pill xl:px-2 xl:text-sm 2xl:gap-2 2xl:px-4 2xl:text-base',
                     'transition-[background-color,color,box-shadow,transform] duration-150 ease-out',
                     isActive
                       ? 'bg-brand-gradient text-ink-inverse shadow-[var(--shadow-3d-brand)] active:translate-y-0.5 active:shadow-[var(--shadow-3d-brand-pressed)]'
@@ -59,7 +59,7 @@ export function TopNav({ role, badges }: { role: UserRole; badges: Record<string
                   <item.icon className="size-5 shrink-0" aria-hidden="true" />
                   <span aria-hidden="true">{TOP_LABEL[item.path] ?? item.label}</span>
                   {badge > 0 && (
-                    <span aria-hidden="true" className="absolute left-1/2 top-1 ml-1 grid h-5 min-w-5 place-items-center rounded-full bg-gold px-1.5 text-[11px] font-semibold leading-none text-ink ring-2 ring-surface motion-safe:animate-[pop_200ms_var(--ease-out)_both] xl:static xl:ring-0">
+                    <span aria-hidden="true" className="absolute left-1/2 top-1 ml-1 grid h-5 min-w-5 place-items-center rounded-full bg-gold px-1.5 text-xs font-semibold leading-none text-ink ring-2 ring-surface motion-safe:animate-[pop_200ms_var(--ease-out)_both] xl:static xl:ring-0">
                       {badge > 99 ? '99+' : badge}
                     </span>
                   )}

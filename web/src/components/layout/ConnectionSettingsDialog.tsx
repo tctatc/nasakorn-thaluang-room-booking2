@@ -122,7 +122,7 @@ export function ConnectionSettingsDialog({ onClose }: { onClose: () => void }) {
             const detected = errors[field] === '' ? extractConnectionId(field, values[field]) : '';
             return (
               <div key={field}>
-                <label htmlFor={inputId} className="mb-2 block text-[15px] font-semibold text-ink">{label}</label>
+                <label htmlFor={inputId} className="mb-2 block text-base font-semibold text-ink">{label}</label>
                 <input
                   id={inputId}
                   type="url"

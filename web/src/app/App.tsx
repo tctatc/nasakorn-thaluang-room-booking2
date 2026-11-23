@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AppShell } from '../components/layout/AppShell';
 import { LoadingState } from '../components/ui/States';
 import { DashboardPage } from '../features/dashboard/DashboardPage';
@@ -9,6 +9,11 @@ import { BookingPage, BookingsPage, RoomsPage } from '../features/BookingPages';
 import { ApprovalsPage, PrintFormPage } from '../features/ApprovalReportPages';
 import { UsersPage } from '../features/users/UsersPage';
 import { ManagePage } from '../features/manage/ManagePage';
+import { PublicShell } from '../components/layout/PublicShell';
+import { PublicHomePage } from '../features/public/PublicHomePage';
+import { QrPosterPage } from '../features/public/QrPosterPage';
+import { TrackLookupPage, TrackPage } from '../features/track/TrackPage';
+import { NAV_ITEMS } from './navigation';
 import { ReviewsPage } from '../features/reviews/ReviewsPage';
 import { ReportsPage } from '../features/reports/ReportsPage';
 import { canSeeAllBookings } from '@shared/domain/approval';
@@ -26,6 +31,20 @@ function AllBookingsOnly({ children }: { children: ReactNode }) {
   return user !== null && canSeeAllBookings(user.role) ? children : <Navigate to="/" replace />;
 }
 
+/** ยังไม่เข้าสู่ระบบแต่เปิดลิงก์หน้าของเจ้าหน้าที่ (เช่น #/approvals) → ไปหน้าเข้าสู่ระบบ ที่เหลือกลับหน้าแรก */
+function StaffPathOrHome() {
+  const { pathname, search } = useLocation();
+  const staffPath = NAV_ITEMS.some((item) => item.path !== '/' && pathname.startsWith(item.path));
+  // จำหน้าที่ตั้งใจเปิดไว้ เข้าสู่ระบบแล้วพากลับไปหน้านั้น
+  return staffPath ? <Navigate to="/login" replace state={{ from: `${pathname}${search}` }} /> : <Navigate to="/" replace />;
+}
+
+/** เพิ่งเข้าสู่ระบบจากหน้า /login → กลับไปหน้าที่ตั้งใจเปิด (ถ้ามี) ไม่งั้นหน้าภาพรวม */
+function AfterLogin() {
+  const from = (useLocation().state as { from?: unknown } | null)?.from;
+  return <Navigate to={typeof from === 'string' && from.startsWith('/') && !from.startsWith('//') ? from : '/'} replace />;
+}
+
 export function App() {
   const { phase } = useApp();
 
@@ -37,7 +56,21 @@ export function App() {
     );
   }
 
-  if (phase === 'anonymous') return <LoginPage />;
+  if (phase === 'anonymous') {
+    return (
+      <Routes>
+        <Route element={<PublicShell />}>
+          <Route path="/" element={<PublicHomePage />} />
+          <Route path="/book" element={<BookingPage />} />
+          <Route path="/track" element={<TrackLookupPage />} />
+          <Route path="/track/:code" element={<TrackPage />} />
+          <Route path="/qr" element={<QrPosterPage />} />
+        </Route>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="*" element={<StaffPathOrHome />} />
+      </Routes>
+    );
+  }
 
   return (
     <Routes>
@@ -57,7 +90,10 @@ export function App() {
           เส้นทางของโมดูลที่ยังไม่เสร็จ ชี้กลับหน้าภาพรวม
           เพื่อไม่ให้ใครเจอหน้าขาวจากการพิมพ์ URL หรือกดลิงก์เก่า
         */}
-        <Route path="/login" element={<Navigate to="/" replace />} />
+        <Route path="/track" element={<TrackLookupPage />} />
+        <Route path="/track/:code" element={<TrackPage />} />
+        <Route path="/qr" element={<QrPosterPage />} />
+        <Route path="/login" element={<AfterLogin />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

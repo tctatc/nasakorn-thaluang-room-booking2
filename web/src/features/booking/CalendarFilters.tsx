@@ -38,7 +38,7 @@ export function CalendarFilters({
             value={query}
             onChange={(event) => onQuery(event.target.value)}
             placeholder="ค้นหาแผนกวิชา หรือชื่อผู้จอง"
-            className="min-h-11 w-full rounded-control border border-line bg-surface pl-9 pr-9 text-[15px] text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+            className="min-h-11 w-full rounded-control border border-line bg-surface pl-9 pr-9 text-base text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
           />
           {query && (
             <button type="button" onClick={() => onQuery('')} aria-label="ล้างคำค้นหา" className="absolute right-1 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-control text-ink-subtle hover:text-ink">
@@ -50,7 +50,7 @@ export function CalendarFilters({
           type="button"
           onClick={onExport}
           disabled={resultCount === 0}
-          className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-control bg-surface px-4 text-[15px] font-medium text-ink ring-1 ring-line transition-colors hover:bg-surface-sunken hover:ring-line-strong disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-control bg-surface px-4 text-base font-medium text-ink ring-1 ring-line transition-colors hover:bg-surface-sunken hover:ring-line-strong disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Download className="size-4 text-ok" aria-hidden="true" />
           ดาวน์โหลด Excel
