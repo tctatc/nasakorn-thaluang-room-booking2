@@ -18,7 +18,7 @@
 
 function loginFailureKey_() {
   // แบ่งถังละหนึ่งชั่วโมง เมื่อขึ้นชั่วโมงใหม่ตัวนับเริ่มใหม่เอง
-  return `login_fail_${Math.floor(serverNow_().getTime() / 3_600_000)}`;
+  return `login_fail_${Math.floor(serverNow_().getTime() / 3600000)}`;
 }
 
 function assertLoginAllowed_() {
@@ -157,7 +157,7 @@ function login_(raw) {
 }
 
 function pinLoginFailureKey_() {
-  return `pin_login_fail_${Math.floor(serverNow_().getTime() / 3_600_000)}`;
+  return `pin_login_fail_${Math.floor(serverNow_().getTime() / 3600000)}`;
 }
 
 /** ทาง ข: PIN อย่างเดียว — ไล่เทียบกับทุกบัญชี (คนละ salt จึงต้องคำนวณทีละคน) */

@@ -69,6 +69,14 @@ describe('ไฟล์ฝั่ง Apps Script', () => {
     }
   });
 
+  it('ไม่ใช้ตัวคั่นหลักตัวเลข (3_600_000) — esbuild ผ่าน แต่ Apps Script ปฏิเสธตอน push ทั้งโปรเจกต์', () => {
+    const offenders = files
+      // ตัดแค่คอมเมนต์ — ตัวเลขใน \`\${...}\` ของ template string ก็โดนปฏิเสธเหมือนกัน
+      .filter((file) => /\b\d+(?:_\d+)+\b/.test(file.code.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ')))
+      .map((file) => file.name);
+    expect(offenders).toEqual([]);
+  });
+
   it('ทุก Domain.xxx ที่ถูกเรียก มีอยู่จริงใน bundle', () => {
     const available = domainExports();
     const missing: string[] = [];
