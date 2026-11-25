@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  AirVent, CalendarDays, Check, Clock3, DoorOpen, FileText, History, MapPin, Mic, Package, Paperclip, Projector, Send, Users, Volume2, Wifi, X, type LucideIcon,
+  AirVent, CalendarDays, Check, ChevronDown, Clock3, DoorOpen, FileText, History, Pencil, UserRound, MapPin, Mic, Package, Paperclip, Projector, Send, Users, Volume2, Wifi, X, type LucideIcon,
 } from 'lucide-react';
 import {
   ATTACHMENT_ACCEPT, ATTACHMENT_LOCAL_MAX_BYTES, ATTACHMENT_MAX_BYTES, ATTACHMENT_TYPES_TEXT, formatFileSize, validateAttachmentUpload,
@@ -17,6 +17,7 @@ import { useLookups } from '../../lib/hooks/useLookups';
 import type { SystemSettings } from '@shared/schemas/settings';
 import { useApp } from '../../app/providers/AppProvider';
 import { rememberTracking } from '../track/trackingMemory';
+import { forgetBookerProfile, readBookerProfile, rememberByDefault, saveBookerProfile } from './bookerMemory';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { Alert } from '../../components/ui/Alert';
@@ -116,16 +117,21 @@ export function BookingPage() {
   const [end, setEnd] = useState(() => (isTime(params.get('end')) ? params.get('end')! : '10:00'));
   // ช่องดักบอท — ซ่อนจากคนจริง ถ้ามีค่าเซิร์ฟเวอร์จะปฏิเสธ
   const [website, setWebsite] = useState('');
-  const [namePrefix, setNamePrefix] = useState('นาย');
-  const [bookerName, setBookerName] = useState('');
+  // ข้อมูลผู้จองที่จำไว้ในเครื่องนี้ (ถ้ามี) — จองครั้งต่อไปไม่ต้องพิมพ์ซ้ำ
+  const [savedBooker] = useState(readBookerProfile);
+  const [editingBooker, setEditingBooker] = useState(savedBooker === null);
+  const [rememberMe, setRememberMe] = useState(() => savedBooker !== null || rememberByDefault());
+  const [extrasOpen, setExtrasOpen] = useState(false);
+  const [namePrefix, setNamePrefix] = useState(savedBooker?.namePrefix ?? 'นาย');
+  const [bookerName, setBookerName] = useState(savedBooker?.bookerName ?? '');
   const [previewOpen, setPreviewOpen] = useState(false);
   const closePreview = useCallback(() => setPreviewOpen(false), []);
   const lookups = useLookups();
   // ตำแหน่งและหน่วยงานเติมจากบัญชีผู้ใช้ — แก้ได้ถ้าจองแทนคนอื่น
-  const [position, setPosition] = useState(user?.position ?? '');
+  const [position, setPosition] = useState(savedBooker?.position || user?.position || '');
   const [meetingType, setMeetingType] = useState('');
-  const [department, setDepartment] = useState(user?.department ?? '');
-  const [phone, setPhone] = useState('');
+  const [department, setDepartment] = useState(savedBooker?.department || user?.department || '');
+  const [phone, setPhone] = useState(savedBooker?.phone ?? '');
   const [title, setTitle] = useState('');
   const [customLocation, setCustomLocation] = useState('');
   const [attendees, setAttendees] = useState('2');
@@ -217,11 +223,21 @@ export function BookingPage() {
     title.trim() === '' && 'เรื่องที่ใช้ห้อง',
     !termsAccepted && 'ติ๊กยอมรับเงื่อนไข',
   ].filter((item): item is string => typeof item === 'string');
+  // บอกบนแถบที่พับไว้ว่ากรอกอะไรไปแล้ว — ไม่ต้องเปิดดูก็รู้
+  const extrasPicked = [
+    ...requestedFacilities.map((key) => lookups.label('facility', key)),
+    ...((Number(extraFurnitureCount) || 0) > 0 ? [`โต๊ะ/เก้าอี้ ${extraFurnitureCount} ตัว`] : []),
+    ...otherItems(otherFacility),
+    ...(meetingType ? [lookups.label('meetingType', meetingType)] : []),
+    ...(note.trim() ? ['รายละเอียด'] : []),
+    ...(attachment ? ['ไฟล์แนบ'] : []),
+  ];
+  const extrasSummary = extrasPicked.length ? `เลือกไว้: ${extrasPicked.join(', ')}` : 'อุปกรณ์ที่ขอ ประเภทการประชุม รายละเอียด เอกสารแนบ';
   const done = {
     room: roomId !== '' && (!openLocation || customLocation.trim() !== ''),
     time: !roomConflict && !dayClosed && !tooOld,
-    booker: [bookerName, position, department, phone, title].every((value) => value.trim() !== '') && attendeeCount > 0 && !overCapacity,
-    terms: termsAccepted,
+    booker: [bookerName, position, department, phone].every((value) => value.trim() !== ''),
+    meeting: title.trim() !== '' && attendeeCount > 0 && !overCapacity && termsAccepted,
   };
 
   // ชื่อเต็มตามแบบฟอร์ม: คำนำหน้าติดชื่อ (เช่น นายสมชาย ใจดี)
@@ -246,6 +262,8 @@ export function BookingPage() {
       // ไม่ได้เข้าสู่ระบบ = ผู้จองทั่วไป (กรอกชื่อ เบอร์ แผนก) ได้รหัสติดตามไว้ดูสถานะ
       const { trackingCode } = user ? await api.createBooking(token, request) : await api.guestBooking({ ...request, website });
       rememberTracking({ code: trackingCode, title, dateKey, startMin, endMin, roomId });
+      if (rememberMe) saveBookerProfile({ namePrefix, bookerName, position, department, phone });
+      else forgetBookerProfile();
       nav(`/track/${trackingCode}`, { state: { justBooked: true } });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ');
@@ -261,7 +279,7 @@ export function BookingPage() {
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
         <form id="booking-form" className="enter-stagger min-w-0 space-y-5" onSubmit={submit}>
           {error && <Alert tone="danger" title="จองไม่สำเร็จ">{error}</Alert>}
-          {!user && (
+          {!user && !savedBooker && (
             <Alert tone="info" title="จองได้เลย ไม่ต้องเข้าสู่ระบบ">
               กรอกชื่อ เบอร์โทร และแผนกให้ครบ ส่งแล้วจะได้รหัสติดตามกับ QR Code ไว้ดูผลอนุมัติและพิมพ์แบบฟอร์ม
             </Alert>
@@ -436,7 +454,37 @@ export function BookingPage() {
             </div></>}
           </Section>
 
-          <Section step={3} title="ข้อมูลผู้ขอใช้" hint="ตามแบบคำขออนุญาตใช้ห้องประชุม" done={done.booker}>
+          <Section step={3} title="ผู้จอง" hint={savedBooker && !editingBooker ? 'ใช้ข้อมูลที่จำไว้ในเครื่องนี้' : 'ชื่อและเบอร์ที่ผู้อนุมัติติดต่อกลับได้'} done={done.booker}>
+            {savedBooker && !editingBooker ? (
+              <div className="flex flex-wrap items-center gap-3 rounded-control bg-surface-sunken px-3.5 py-3 ring-1 ring-inset ring-line">
+                <span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-full bg-brand-soft text-brand">
+                  <UserRound className="size-5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold text-ink">{fullName}</p>
+                  <p className="truncate text-sm text-ink-muted">{[position, department].filter(Boolean).join(' · ')}</p>
+                  <p className="text-sm tabular-nums text-ink-muted">{phone}</p>
+                </div>
+                <div className="flex w-full gap-2 sm:w-auto">
+                  <button type="button" onClick={() => setEditingBooker(true)} className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-control bg-surface px-3 text-sm font-medium text-brand ring-1 ring-inset ring-brand-border transition-colors duration-150 hover:bg-brand-soft sm:flex-none">
+                    <Pencil className="size-4" aria-hidden="true" />แก้ไข
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      forgetBookerProfile();
+                      setNamePrefix('นาย'); setBookerName(''); setPhone('');
+                      setPosition(user?.position ?? ''); setDepartment(user?.department ?? '');
+                      setRememberMe(false); setEditingBooker(true);
+                    }}
+                    className="inline-flex min-h-11 flex-1 items-center justify-center rounded-control bg-surface px-3 text-sm font-medium text-ink-muted ring-1 ring-inset ring-line transition-colors duration-150 hover:text-ink sm:flex-none"
+                  >
+                    ไม่ใช่ฉัน
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label className={labelClass} htmlFor="booker-name">ชื่อผู้จอง</label>
@@ -464,14 +512,16 @@ export function BookingPage() {
                 <input className={inputClass} id="phone" type="tel" inputMode="tel" required maxLength={30} autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="เช่น 081-234-5678" />
               </div>
             </div>
-            <div className="mt-4 grid gap-4 sm:grid-cols-[minmax(0,1fr)_11rem]">
-              <div className="sm:col-span-2">
-                <label className={labelClass} htmlFor="meeting-type">ประเภทการประชุม <span className="font-normal text-ink-subtle">(ถ้ามี)</span></label>
-                <select className={inputClass} id="meeting-type" value={meetingType} onChange={(e) => setMeetingType(e.target.value)}>
-                  <option value="">ไม่ระบุ</option>
-                  {lookups.active('meetingType').map((item) => <option key={item.lookupId} value={item.key}>{item.label}</option>)}
-                </select>
-              </div>
+                <label className="mt-4 flex min-h-11 cursor-pointer items-center gap-3 text-sm text-ink">
+                  <input type="checkbox" className="size-5 shrink-0 accent-brand" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} />
+                  <span>จำข้อมูลของฉันไว้ในเครื่องนี้ <span className="text-ink-subtle">(ครั้งหน้าไม่ต้องพิมพ์ใหม่)</span></span>
+                </label>
+              </>
+            )}
+          </Section>
+
+          <Section step={4} title="เรื่องที่ประชุม" hint="ใช้พิมพ์ลงแบบคำขอ" done={done.meeting}>
+            <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_11rem]">
               <div>
                 <label className={labelClass} htmlFor="title">เพื่อใช้ในการดำเนินงาน เรื่อง</label>
                 <input className={inputClass} id="title" required maxLength={200} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="เช่น ประชุมครูประจำแผนกวิชา" />
@@ -484,37 +534,27 @@ export function BookingPage() {
                 </p>
               </div>
             </div>
-            <div className="mt-4">
-              <label className={labelClass} htmlFor="note">รายละเอียดเพิ่มเติม <span className="font-normal text-ink-subtle">(ถ้ามี)</span></label>
-              <textarea className={cn(inputClass, 'min-h-24 py-2.5')} id="note" maxLength={1000} value={note} onChange={(e) => setNote(e.target.value)} placeholder="วาระการประชุมหรือข้อมูลที่ต้องแจ้งผู้ดูแล" />
-            </div>
-            <div className="mt-4">
-              <p className={labelClass}>เอกสารแนบ <span className="font-normal text-ink-subtle">(ถ้ามี เช่น บันทึกข้อความ วาระการประชุม)</span></p>
-              {attachment ? (
-                <div className="flex min-h-14 items-center gap-3 rounded-control border border-ok-border bg-ok-soft px-3 py-2">
-                  {(() => { const Icon = attachmentIcon(attachment.mimeType); return <Icon className="size-5 shrink-0 text-ok" aria-hidden="true" />; })()}
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium text-ink">{attachment.name}</span>
-                    <span className="block text-xs text-ink-muted">{formatFileSize(attachment.size)} · แนบไปกับคำขอ ผู้อนุมัติเปิดได้จาก LINE</span>
-                  </span>
-                  <button type="button" onClick={() => setAttachment(null)} aria-label={`เอาไฟล์ ${attachment.name} ออก`} className="grid size-10 shrink-0 place-items-center rounded-control text-ink-muted hover:bg-surface hover:text-danger">
-                    <X className="size-5" aria-hidden="true" />
-                  </button>
-                </div>
-              ) : (
-                <label htmlFor="attachment" className="flex min-h-14 cursor-pointer items-center justify-center gap-2 rounded-control border border-dashed border-line-strong px-3 text-sm font-medium text-ink-muted transition-colors duration-150 hover:border-brand-border hover:bg-brand-soft/40 hover:text-brand has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand">
-                  <input ref={fileInputRef} id="attachment" type="file" accept={ATTACHMENT_ACCEPT} className="sr-only" aria-describedby="attachment-hint" onChange={(e) => void chooseFile(e.target.files?.[0])} />
-                  <Paperclip className="size-4" aria-hidden="true" />
-                  {readingFile ? 'กำลังอ่านไฟล์…' : 'เลือกไฟล์แนบ'}
-                </label>
-              )}
-              <p id="attachment-hint" className={cn('mt-1 text-xs', attachmentError ? 'font-medium text-danger' : 'text-ink-subtle')} role={attachmentError ? 'alert' : undefined}>
-                {attachmentError || `${ATTACHMENT_TYPES_TEXT} 1 ไฟล์ ไม่เกิน ${formatFileSize(maxAttachmentBytes)} · เปิดดูได้เฉพาะผู้จอง ผู้อนุมัติ และผู้ดูแลระบบ`}
-              </p>
-            </div>
+            <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-control border border-line p-3.5 text-sm leading-6 text-ink-muted transition-colors duration-150 has-[:checked]:border-ok-border has-[:checked]:bg-ok-soft has-[:checked]:font-medium has-[:checked]:text-ok">
+              <input className="mt-1" type="checkbox" required checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} />
+              <span>ข้าพเจ้าขอรับรองว่าจะดูแลรักษาทรัพย์สินของทางราชการ และปฏิบัติตามระเบียบของวิทยาลัยโดยเคร่งครัด</span>
+            </label>
           </Section>
 
-          <Section step={4} title="อุปกรณ์และเงื่อนไข" hint="เลือกเฉพาะที่ต้องการให้เตรียม" done={done.terms}>
+          <details
+            open={extrasOpen}
+            onToggle={(e) => setExtrasOpen(e.currentTarget.open)}
+            className="group rounded-card border border-line bg-surface shadow-card"
+          >
+            <summary className="flex min-h-16 cursor-pointer list-none items-center gap-3 rounded-card px-5 py-4 sm:px-6 [&::-webkit-details-marker]:hidden focus-visible:ring-2 focus-visible:ring-brand">
+              <div className="min-w-0 flex-1">
+                <p className="text-base font-semibold text-ink">ข้อมูลเพิ่มเติม <span className="font-normal text-ink-subtle">(ไม่บังคับ)</span></p>
+                <p className="text-sm text-ink-muted">{extrasSummary}</p>
+              </div>
+              <ChevronDown className="size-5 shrink-0 text-ink-muted transition-transform duration-200 group-open:rotate-180" aria-hidden="true" />
+            </summary>
+            <div className="space-y-4 border-t border-line px-5 pb-5 pt-4 sm:px-6 sm:pb-6">
+              <div>
+                <p className={labelClass}>อุปกรณ์ที่ต้องการให้เตรียม</p>
             <fieldset className="min-w-0">
               <legend className="sr-only">ครุภัณฑ์/อุปกรณ์/สิ่งอำนวยความสะดวกที่ขอใช้</legend>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -530,7 +570,8 @@ export function BookingPage() {
                 })}
               </div>
             </fieldset>
-            <div className="mt-4 grid gap-4 sm:grid-cols-[11rem_minmax(0,1fr)]">
+              </div>
+            <div className="grid gap-4 sm:grid-cols-[11rem_minmax(0,1fr)]">
               <div>
                 <label className={labelClass} htmlFor="extra-furniture">โต๊ะ/เก้าอี้เพิ่ม (ตัว)</label>
                 <input className={inputClass} id="extra-furniture" type="number" inputMode="numeric" min="0" max="500" value={extraFurnitureCount} onChange={(e) => setExtraFurnitureCount(e.target.value)} />
@@ -556,11 +597,43 @@ export function BookingPage() {
                 </div>
               </div>
             </div>
-            <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-control border border-line p-3.5 text-sm leading-6 text-ink-muted transition-colors duration-150 has-[:checked]:border-ok-border has-[:checked]:bg-ok-soft has-[:checked]:font-medium has-[:checked]:text-ok">
-              <input className="mt-1" type="checkbox" required checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} />
-              <span>ข้าพเจ้าขอรับรองว่าจะดูแลรักษาทรัพย์สินของทางราชการ และปฏิบัติตามระเบียบของวิทยาลัยโดยเคร่งครัด</span>
-            </label>
-          </Section>
+              <div>
+                <label className={labelClass} htmlFor="meeting-type">ประเภทการประชุม <span className="font-normal text-ink-subtle">(ถ้ามี)</span></label>
+                <select className={inputClass} id="meeting-type" value={meetingType} onChange={(e) => setMeetingType(e.target.value)}>
+                  <option value="">ไม่ระบุ</option>
+                  {lookups.active('meetingType').map((item) => <option key={item.lookupId} value={item.key}>{item.label}</option>)}
+                </select>
+              </div>
+            <div>
+              <label className={labelClass} htmlFor="note">รายละเอียดเพิ่มเติม <span className="font-normal text-ink-subtle">(ถ้ามี)</span></label>
+              <textarea className={cn(inputClass, 'min-h-24 py-2.5')} id="note" maxLength={1000} value={note} onChange={(e) => setNote(e.target.value)} placeholder="วาระการประชุมหรือข้อมูลที่ต้องแจ้งผู้ดูแล" />
+            </div>
+            <div>
+              <p className={labelClass}>เอกสารแนบ <span className="font-normal text-ink-subtle">(ถ้ามี เช่น บันทึกข้อความ วาระการประชุม)</span></p>
+              {attachment ? (
+                <div className="flex min-h-14 items-center gap-3 rounded-control border border-ok-border bg-ok-soft px-3 py-2">
+                  {(() => { const Icon = attachmentIcon(attachment.mimeType); return <Icon className="size-5 shrink-0 text-ok" aria-hidden="true" />; })()}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-ink">{attachment.name}</span>
+                    <span className="block text-xs text-ink-muted">{formatFileSize(attachment.size)} · แนบไปกับคำขอ ผู้อนุมัติเปิดได้จาก LINE</span>
+                  </span>
+                  <button type="button" onClick={() => setAttachment(null)} aria-label={`เอาไฟล์ ${attachment.name} ออก`} className="grid size-10 shrink-0 place-items-center rounded-control text-ink-muted hover:bg-surface hover:text-danger">
+                    <X className="size-5" aria-hidden="true" />
+                  </button>
+                </div>
+              ) : (
+                <label htmlFor="attachment" className="flex min-h-14 cursor-pointer items-center justify-center gap-2 rounded-control border border-dashed border-line-strong px-3 text-sm font-medium text-ink-muted transition-colors duration-150 hover:border-brand-border hover:bg-brand-soft/40 hover:text-brand has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand">
+                  <input ref={fileInputRef} id="attachment" type="file" accept={ATTACHMENT_ACCEPT} className="sr-only" aria-describedby="attachment-hint" onChange={(e) => void chooseFile(e.target.files?.[0])} />
+                  <Paperclip className="size-4" aria-hidden="true" />
+                  {readingFile ? 'กำลังอ่านไฟล์…' : 'เลือกไฟล์แนบ'}
+                </label>
+              )}
+              <p id="attachment-hint" className={cn('mt-1 text-xs', attachmentError ? 'font-medium text-danger' : 'text-ink-subtle')} role={attachmentError ? 'alert' : undefined}>
+                {attachmentError || `${ATTACHMENT_TYPES_TEXT} 1 ไฟล์ ไม่เกิน ${formatFileSize(maxAttachmentBytes)} · เปิดดูได้เฉพาะผู้จอง ผู้อนุมัติ และผู้ดูแลระบบ`}
+              </p>
+            </div>
+            </div>
+          </details>
 
           <button
             type="button"
@@ -606,7 +679,7 @@ export function BookingPage() {
             {room?.name ?? 'เลือกห้อง'} · {thaiDate(dateKey, { day: 'numeric', month: 'short' })} · <span className={cn(roomConflict && 'text-danger')}>{start}–{end} น.</span>
           </p>
           <p className={cn('mt-0.5 text-xs lg:mt-0 lg:border-t lg:border-line lg:px-5 lg:py-3', missing.length ? 'text-warn' : 'text-ok')}>
-            {missing.length ? `ยังขาด: ${missing.join(' · ')}` : rules.approvalRequired ? 'พร้อมส่ง คำขอจะผ่านการอนุมัติ 3 ขั้น ติดตามได้ที่รายการจองของฉัน' : 'พร้อมส่ง ส่งแล้วได้ห้องทันที'}
+            {missing.length ? `ยังขาด: ${missing.join(' · ')}` : rules.approvalRequired ? (user ? 'พร้อมส่ง คำขอจะผ่านการอนุมัติ 3 ขั้น ติดตามได้ที่รายการจองของฉัน' : 'พร้อมส่ง ส่งแล้วได้ QR ไว้ติดตามผลอนุมัติ') : 'พร้อมส่ง ส่งแล้วได้ห้องทันที'}
           </p>
           <div className="mt-2 flex gap-3 lg:mt-0 lg:flex-col-reverse lg:gap-2 lg:px-5 lg:pb-5">
             <Button variant="secondary" onClick={() => nav(-1)}>กลับ</Button>

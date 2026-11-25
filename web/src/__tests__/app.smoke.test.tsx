@@ -819,6 +819,8 @@ describe('ผู้จองทั่วไป: จองได้โดยไ�
     await user.type(screen.getByLabelText('ตำแหน่ง'), 'ครู');
     await user.type(screen.getByLabelText('หน่วยงาน / สาขาวิชา'), 'แผนกวิชาการบัญชี');
     await user.type(screen.getByLabelText('หมายเลขโทรศัพท์'), '089-555-0000');
+    const remember = screen.getByLabelText(/จำข้อมูลของฉันไว้ในเครื่องนี้/) as HTMLInputElement;
+    if (!remember.checked) await user.click(remember);
     await user.type(screen.getByLabelText('เพื่อใช้ในการดำเนินงาน เรื่อง'), 'ประชุมผู้ปกครองนักศึกษา');
     fireEvent.change(screen.getByLabelText('วันที่'), { target: { value: '2030-01-02' } });
     fireEvent.change(screen.getByLabelText('เริ่ม'), { target: { value: '13:00' } });
@@ -834,7 +836,16 @@ describe('ผู้จองทั่วไป: จองได้โดยไ�
 
     await user.click(within(screen.getByRole('navigation', { name: 'เมนูหลัก' })).getByRole('link', { name: /ติดตามสถานะ/ }));
     expect(await screen.findByText('ประชุมผู้ปกครองนักศึกษา')).toBeDefined();
-  }, 15_000);
+
+    // จองครั้งต่อไปจากเครื่องเดิม: ข้อมูลผู้จองขึ้นให้เลย กด "ไม่ใช่ฉัน" แล้วล้างทิ้ง
+    await user.click(within(screen.getByRole('navigation', { name: 'เมนูหลัก' })).getByRole('link', { name: /จองห้อง/ }));
+    expect(await screen.findByText('นายผู้จอง ทั่วไป')).toBeDefined();
+    expect(screen.queryByLabelText('หมายเลขโทรศัพท์')).toBeNull();
+    expect(screen.queryByText('จองได้เลย ไม่ต้องเข้าสู่ระบบ')).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'ไม่ใช่ฉัน' }));
+    expect((screen.getByLabelText('ชื่อผู้จอง') as HTMLInputElement).value).toBe('');
+    expect(window.localStorage.getItem('mrb.booker.v1')).toBeNull();
+  }, 20_000);
 
   it('ใส่รหัสผิดรูปแบบบอกทันที รหัสที่ไม่มีอยู่บอกว่าไม่พบ', async () => {
     const user = userEvent.setup();
