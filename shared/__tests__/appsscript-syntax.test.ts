@@ -77,6 +77,21 @@ describe('ไฟล์ฝั่ง Apps Script', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('สิทธิ์ใน appsscript.json พอกับบริการที่โค้ดเรียก (ขาดแล้วพังตอนรันจริงเท่านั้น)', () => {
+    const manifest = JSON.parse(readFileSync(join(APPS_SCRIPT_DIR, 'appsscript.json'), 'utf8')) as { oauthScopes: string[] };
+    const needs: [RegExp, string][] = [
+      // DriveApp ใช้ drive.file ไม่ได้ ต้องสิทธิ์ drive เต็ม (เจอจริงตอน setupSystem)
+      [/\bDriveApp\./, 'https://www.googleapis.com/auth/drive'],
+      [/\bSpreadsheetApp\./, 'https://www.googleapis.com/auth/spreadsheets'],
+      [/\bUrlFetchApp\./, 'https://www.googleapis.com/auth/script.external_request'],
+    ];
+    const missing = needs
+      .filter(([pattern]) => files.some((file) => pattern.test(stripCommentsAndStrings(file.code))))
+      .map(([, scope]) => scope)
+      .filter((scope) => !manifest.oauthScopes.includes(scope));
+    expect(missing).toEqual([]);
+  });
+
   it('ทุก Domain.xxx ที่ถูกเรียก มีอยู่จริงใน bundle', () => {
     const available = domainExports();
     const missing: string[] = [];
