@@ -16,6 +16,7 @@ import { TrackLookupPage, TrackPage } from '../features/track/TrackPage';
 import { NAV_ITEMS } from './navigation';
 import { ReviewsPage } from '../features/reviews/ReviewsPage';
 import { ReportsPage } from '../features/reports/ReportsPage';
+import { AttachmentPage } from '../features/attachment/AttachmentPage';
 import { canSeeAllBookings } from '@shared/domain/approval';
 import { useApp } from './providers/AppProvider';
 
@@ -34,7 +35,8 @@ function AllBookingsOnly({ children }: { children: ReactNode }) {
 /** ยังไม่เข้าสู่ระบบแต่เปิดลิงก์หน้าของเจ้าหน้าที่ (เช่น #/approvals) → ไปหน้าเข้าสู่ระบบ ที่เหลือกลับหน้าแรก */
 function StaffPathOrHome() {
   const { pathname, search } = useLocation();
-  const staffPath = NAV_ITEMS.some((item) => item.path !== '/' && pathname.startsWith(item.path));
+  // หน้าเอกสารแนบ (ลิงก์จาก LINE) ต้องเข้าสู่ระบบก่อนเสมอ
+  const staffPath = pathname.startsWith('/attachment/') || NAV_ITEMS.some((item) => item.path !== '/' && pathname.startsWith(item.path));
   // จำหน้าที่ตั้งใจเปิดไว้ เข้าสู่ระบบแล้วพากลับไปหน้านั้น
   return staffPath ? <Navigate to="/login" replace state={{ from: `${pathname}${search}` }} /> : <Navigate to="/" replace />;
 }
@@ -86,6 +88,7 @@ export function App() {
         <Route path="/summary" element={<AllBookingsOnly><ReportsPage /></AllBookingsOnly>} />
         <Route path="/reviews" element={<AdminOnly><ReviewsPage /></AdminOnly>} />
         <Route path="/manage" element={<AdminOnly><ManagePage /></AdminOnly>} />
+        <Route path="/attachment/:bookingId" element={<AttachmentPage />} />
         {/*
           เส้นทางของโมดูลที่ยังไม่เสร็จ ชี้กลับหน้าภาพรวม
           เพื่อไม่ให้ใครเจอหน้าขาวจากการพิมพ์ URL หรือกดลิงก์เก่า

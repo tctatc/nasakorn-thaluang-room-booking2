@@ -81,3 +81,28 @@ export interface Transport {
   call<T>(action: string, payload?: unknown, token?: string): Promise<T>;
   version(): Promise<VersionResult>;
 }
+
+/** ไฟล์ที่แนบมากับคำขอจอง (ฝั่งหน้าเว็บอ่านไฟล์เป็น base64 ก่อนส่ง) */
+export interface AttachmentInput {
+  name: string;
+  dataBase64: string;
+}
+
+/** สถานะการแจ้งเตือน LINE ที่ผู้ดูแลเห็น — ไม่มีโทเคน บอกแค่ว่าตั้งแล้วหรือยัง */
+export interface LineStatus {
+  /** โหมดทดลองในเบราว์เซอร์ (ส่ง LINE ไม่ได้) */
+  demo?: boolean;
+  hasToken: boolean;
+  targets: string[];
+  siteUrl: string;
+  /** กำลังเปิดรับรหัสกลุ่มถึงเวลานี้ ('' = ไม่ได้เปิด) */
+  captureUntil: string;
+  seen: { id: string; kind: string; at: string }[];
+  last: { at: string; sent: number; failed: number; codes: number[] } | null;
+}
+
+export interface LineSendResult {
+  sent: number;
+  failed: number;
+  skipped?: string;
+}

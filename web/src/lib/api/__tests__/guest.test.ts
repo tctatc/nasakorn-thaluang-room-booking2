@@ -101,4 +101,18 @@ describe('การจองโดยไม่เข้าสู่ระบบ 
     await expect(transport.call('guestBooking', request({ dateKey: futureWeekday(200), requesterPhone: '0899999999' })))
       .rejects.toMatchObject({ code: 'BUSY' });
   }, 30_000);
+
+  it('บันทึกการใช้ห้องย้อนหลังได้ภายใน 7 วัน (ยังรออนุมัติ) เกินกว่านั้นไม่ได้', async () => {
+    const transport = createDemoTransport();
+    const pastWeekday = (from: number) => {
+      let key = addDaysToDateKey(toDateKey(new Date()), -from);
+      while ([0, 6].includes(dayOfWeekOfDateKey(key))) key = addDaysToDateKey(key, -1);
+      return key;
+    };
+    const recent = pastWeekday(1);
+    const { booking } = await transport.call<{ booking: DemoBooking }>('guestBooking', request({ dateKey: recent, startMin: 16 * 60, endMin: 17 * 60 }));
+    expect(booking.status).toBe('pending');
+    await expect(transport.call('guestBooking', request({ dateKey: pastWeekday(10), requesterPhone: '089-555-6666' })))
+      .rejects.toMatchObject({ code: 'VALIDATION' });
+  });
 });

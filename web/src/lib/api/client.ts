@@ -2,10 +2,12 @@
 
 import { createDemoTransport } from './demo';
 import { createHttpTransport } from './transport';
-import type { AdminUser, BootstrapResult, LoginResult, SessionUser, Transport, VersionResult } from './types';
+import type { AdminUser, AttachmentInput, BootstrapResult, LineSendResult, LineStatus, LoginResult, SessionUser, Transport, VersionResult } from './types';
+import type { AttachmentFile } from '@shared/schemas/attachment';
 import type { UserAccountInput } from '@shared/schemas/user';
 import type { DemoBooking, DemoRoom } from './demo';
 import type { BookingRequest } from '@shared/schemas/booking';
+import type { AdminEditableField } from '@shared/domain/admin-booking';
 import type { BusySlot } from '@shared/domain/availability';
 import type { DaySlot } from '@shared/domain/room-status';
 import type { PublicSlot } from '@shared/domain/availability';
@@ -53,10 +55,12 @@ export interface ApiClient {
   /** ปฏิทินสาธารณะ: แค่ห้อง วัน เวลา สถานะ (ไม่เกิน 62 วันต่อครั้ง) */
   publicSchedule(from: string, to: string): Promise<{ slots: PublicSlot[] }>;
   /** จองโดยไม่เข้าสู่ระบบ — website คือช่องดักบอท (คนจริงเว้นว่าง) */
-  guestBooking(input: BookingRequest & { website?: string }): Promise<{ booking: DemoBooking; trackingCode: string }>;
+  guestBooking(input: BookingRequest & { website?: string; attachment?: AttachmentInput }): Promise<{ booking: DemoBooking; trackingCode: string }>;
   /** ดูคำขอด้วยรหัสติดตาม */
   trackBooking(code: string): Promise<{ booking: DemoBooking; room: DemoRoom | null }>;
   trackCancel(code: string, reason: string): Promise<{ booking: DemoBooking }>;
+  /** เอกสารแนบของคำขอ ด้วยรหัสติดตาม */
+  trackAttachment(code: string): Promise<{ attachment: AttachmentFile }>;
   bootstrap(token: string): Promise<BootstrapResult>;
   version(): Promise<VersionResult>;
   rooms(token: string): Promise<{ rooms: DemoRoom[] }>;
@@ -65,10 +69,18 @@ export interface ApiClient {
   availability(token: string, roomId: string, dateKey: string): Promise<{ busy: BusySlot[] }>;
   /** ช่วงที่อนุมัติแล้วของทุกห้องวันนี้ (ไม่มีชื่อ/หัวข้อ) — สถานะห้องตอนนี้ในหน้าภาพรวม */
   roomSlotsToday(token: string): Promise<{ dateKey: string; slots: DaySlot[] }>;
-  createBooking(token: string, input: BookingRequest): Promise<{ booking: DemoBooking; trackingCode: string }>;
+  createBooking(token: string, input: BookingRequest & { attachment?: AttachmentInput }): Promise<{ booking: DemoBooking; trackingCode: string }>;
+  /** เอกสารแนบ — เปิดได้เฉพาะผู้จอง ผู้ลงนาม และผู้ดูแล (server ตรวจ) */
+  bookingAttachment(token: string, bookingId: string): Promise<{ attachment: AttachmentFile; booking: DemoBooking }>;
   cancelBooking(token: string, bookingId: string, reason?: string): Promise<{ booking: DemoBooking }>;
   /** ลงนาม — ต้องแนบ PIN ของผู้ลงนามทุกครั้ง (แทนลายเซ็น) */
   decideBooking(token: string, bookingId: string, decision: 'approve'|'reject', pin: string, reason?: string): Promise<{ booking: DemoBooking }>;
+  /** ผู้ดูแลแก้คำขอที่ส่งมาแล้ว (ห้อง วันเวลา เรื่อง ผู้ขอ ฯลฯ — สถานะและผลลงนามแก้ไม่ได้) */
+  adminUpdateBooking(token: string, input: AdminBookingEditInput): Promise<{ booking: DemoBooking; changed: number }>;
+  /** ผู้ดูแลลบคำขอถาวร (บันทึกสาระสำคัญลง audit log) */
+  adminDeleteBooking(token: string, bookingId: string, reason?: string): Promise<{ deleted: string }>;
+  /** ล้างการจองและรีวิวทั้งหมด ต้องส่งคำยืนยัน — server สำรองชีตไว้ก่อนล้าง */
+  adminResetBookings(token: string, confirm: string): Promise<{ backups: string[]; cleared: Record<string, number> }>;
   /** ประกาศที่ยังแสดงอยู่ (ทุกคนอ่านได้) */
   announcements(token: string): Promise<{ announcements: Announcement[] }>;
   /** เพิ่ม (announcementId = '') หรือแก้ประกาศ — เฉพาะผู้ดูแล */
@@ -88,6 +100,11 @@ export interface ApiClient {
   /** ผู้ดูแลได้ทุกรีวิว คนอื่นได้เฉพาะของตัวเอง */
   reviews(token: string): Promise<{ reviews: Review[] }>;
   submitReview(token: string, input: ReviewInput): Promise<{ review: Review }>;
+  /** แจ้งเตือน LINE — เฉพาะผู้ดูแล */
+  lineStatus(token: string): Promise<LineStatus>;
+  lineSave(token: string, targets: string[], siteUrl: string): Promise<LineStatus>;
+  lineCapture(token: string): Promise<LineStatus>;
+  lineTest(token: string): Promise<{ result: LineSendResult; status: LineStatus }>;
   /** จัดการผู้ใช้ — เฉพาะผู้ดูแล */
   users(token: string): Promise<{ users: AdminUser[] }>;
   createUser(token: string, input: UserAccountInput & { pin: string; password: string }): Promise<{ user: AdminUser }>;
@@ -96,6 +113,9 @@ export interface ApiClient {
   resetUserPassword(token: string, username: string, password: string): Promise<{ ok: boolean }>;
   deleteUser(token: string, username: string): Promise<{ ok: boolean }>;
 }
+
+/** ช่องที่ผู้ดูแลแก้ได้ (ADMIN_EDITABLE_FIELDS) — ช่องที่ไม่ส่งใช้ค่าเดิม */
+export type AdminBookingEditInput = { bookingId: string } & Partial<Pick<BookingRequest, AdminEditableField>>;
 
 function wrap(transport: Transport): ApiClient {
   return {
@@ -109,6 +129,7 @@ function wrap(transport: Transport): ApiClient {
     guestBooking: (input) => announceBookingsChanged(transport.call('guestBooking', input)),
     trackBooking: (code) => transport.call('trackBooking', { code }),
     trackCancel: (code, reason) => announceBookingsChanged(transport.call('trackCancel', { code, reason })),
+    trackAttachment: (code) => transport.call('trackAttachment', { code }),
     bootstrap: (token) => transport.call('bootstrap', {}, token),
     version: () => transport.version(),
     rooms: (token) => transport.call('rooms', {}, token),
@@ -116,8 +137,12 @@ function wrap(transport: Transport): ApiClient {
     availability: (token, roomId, dateKey) => transport.call('availability', { roomId, dateKey }, token),
     roomSlotsToday: (token) => transport.call('roomSlotsToday', {}, token),
     createBooking: (token, input) => announceBookingsChanged(transport.call('createBooking', input, token)),
+    bookingAttachment: (token, bookingId) => transport.call('bookingAttachment', { bookingId }, token),
     cancelBooking: (token, bookingId, reason = '') => announceBookingsChanged(transport.call('cancelBooking', { bookingId, reason }, token)),
     decideBooking: (token, bookingId, decision, pin, reason = '') => announceBookingsChanged(transport.call('decideBooking', { bookingId, decision, reason, pin }, token)),
+    adminUpdateBooking: (token, input) => announceBookingsChanged(transport.call('adminUpdateBooking', input, token)),
+    adminDeleteBooking: (token, bookingId, reason = '') => announceBookingsChanged(transport.call('adminDeleteBooking', { bookingId, reason }, token)),
+    adminResetBookings: (token, confirm) => announceBookingsChanged(transport.call('adminResetBookings', { confirm }, token)),
     announcements: (token) => transport.call('announcements', {}, token),
     saveAnnouncement: (token, input) => transport.call('saveAnnouncement', input, token),
     archiveAnnouncement: (token, announcementId) => transport.call('archiveAnnouncement', { announcementId }, token),
@@ -129,6 +154,10 @@ function wrap(transport: Transport): ApiClient {
     reviewSummary: (token) => transport.call('reviewSummary', {}, token),
     reviews: (token) => transport.call('reviews', {}, token),
     submitReview: (token, input) => announceBookingsChanged(transport.call('submitReview', input, token)),
+    lineStatus: (token) => transport.call('lineStatus', {}, token),
+    lineSave: (token, targets, siteUrl) => transport.call('lineSave', { targets, siteUrl }, token),
+    lineCapture: (token) => transport.call('lineCapture', {}, token),
+    lineTest: (token) => transport.call('lineTest', {}, token),
     users: (token) => transport.call('users', {}, token),
     createUser: (token, input) => transport.call('createUser', input, token),
     updateUser: (token, input) => transport.call('updateUser', input, token),

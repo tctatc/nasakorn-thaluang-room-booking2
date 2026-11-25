@@ -65,7 +65,7 @@ function guestBooking_(raw) {
     email: Domain.guestAccountId(input.requesterPhone), displayName: input.bookerName,
     department: input.department, role: 'guest', allowedRoomIds: [],
   };
-  const result = createBookingAs_(guest, input);
+  const result = createBookingAs_(guest, input, parseAttachment_(raw));
   countHourly_('guest-bookings');
   return result;
 }

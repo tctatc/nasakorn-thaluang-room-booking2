@@ -17,6 +17,7 @@ import { useLiveRefresh } from '../../lib/hooks/useLiveRefresh';
 import { formatFullDate, formatTimeRange } from '../../lib/format/thai';
 import { cn } from '../../lib/cn';
 import { ApprovalProgress } from '../approvals/ApprovalProgress';
+import { AttachmentChip } from '../../components/ui/AttachmentChip';
 import { RequestFormSheet } from '../requestForm/RequestFormSheet';
 import { ScaledSheet } from '../requestForm/ScaledSheet';
 import { forgetTracking, rememberTracking, rememberedBookings } from './trackingMemory';
@@ -122,6 +123,12 @@ export function TrackPage() {
           <p className="text-base text-ink-muted">{formatFullDate(booking.dateKey)} · {formatTimeRange(booking.startMin, booking.endMin)} น.</p>
           <p className="mt-1 text-sm text-ink-muted">ผู้ขอ {booking.bookerName || booking.userName} · {booking.department} · {booking.attendees} คน</p>
         </div>
+        {booking.attachment && (
+          <div>
+            <p className="mb-1.5 text-sm font-medium text-ink">เอกสารแนบ</p>
+            <AttachmentChip meta={booking.attachment} load={() => api.trackAttachment(code).then((result) => result.attachment)} />
+          </div>
+        )}
         <ApprovalProgress booking={booking} />
       </CardBody></Card>
 

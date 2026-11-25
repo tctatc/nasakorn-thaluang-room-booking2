@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { FormPreviewDialog } from '../requestForm/FormPreviewDialog';
 import { useLiveRefresh } from '../../lib/hooks/useLiveRefresh';
 import { Link } from 'react-router-dom';
-import { Check, ClipboardCheck, FileText, KeyRound, Printer, X } from 'lucide-react';
+import { Check, ClipboardCheck, FileText, KeyRound, Pencil, Printer, X } from 'lucide-react';
+import { AdminBookingDialog } from '../booking/AdminBookingDialog';
 import { APPROVAL_STEPS, currentApprovalStep, isAwaitingRole, stepForRole } from '@shared/domain/approval';
 import { useLookups } from '../../lib/hooks/useLookups';
 import { isOpenLocationRoom } from '@shared/schemas/room';
@@ -16,6 +17,8 @@ import { Card, CardBody } from '../../components/ui/Card';
 import { useToast } from '../../components/ui/Toast';
 import type { DemoBooking, DemoRoom } from '../../lib/api/demo';
 import { ApprovalProgress } from './ApprovalProgress';
+import { AttachmentChip } from '../../components/ui/AttachmentChip';
+import { attachmentPagePath } from '@shared/domain/line-message';
 
 const dateText = (key: string) => new Intl.DateTimeFormat('th-TH', { dateStyle: 'full', timeZone: 'Asia/Bangkok' }).format(new Date(`${key}T12:00:00+07:00`));
 const timeText = (min: number) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
@@ -45,6 +48,9 @@ export function ApprovalsPage() {
   const [error, setError] = useState('');
   /** คำขอที่กำลังรอผู้ลงนามใส่ PIN ยืนยัน */
   const [confirming, setConfirming] = useState<{ booking: DemoBooking; decision: 'approve' | 'reject' } | null>(null);
+  /** ผู้ดูแลกำลังแก้/ลบคำขอนี้ */
+  const [editing, setEditing] = useState<DemoBooking | null>(null);
+  const closeEditor = useCallback(() => setEditing(null), []);
 
   const load = useCallback(() => Promise.all([api.bookings(token), api.rooms(token)])
     .then(([b, r]) => { setBookings(b.bookings); setRooms(r.rooms); setLoaded(true); })
@@ -101,13 +107,14 @@ export function ApprovalsPage() {
         />
       )}
 
+      {editing !== null && <AdminBookingDialog booking={editing} rooms={rooms} onClose={closeEditor} onDone={() => void load()} />}
       {isApprover && (
         <section aria-labelledby="mine-title" className="mb-8">
           <h2 id="mine-title" className="mb-3 text-base font-semibold text-ink">รอคุณลงนาม</h2>
           {mine.length ? (
             <div className="space-y-4">
               {mine.map((booking) => (
-                <RequestCard key={booking.bookingId} booking={booking} rooms={rooms}>
+                <RequestCard key={booking.bookingId} booking={booking} rooms={rooms} {...(user.role === 'admin' ? { onEdit: setEditing } : {})}>
                   {reasonId === booking.bookingId && (
                     <div className="mt-4">
                       <label className="mb-1.5 block text-sm font-medium text-ink" htmlFor={`reject-${booking.bookingId}`}>เหตุผลที่ไม่อนุมัติ</label>
@@ -148,7 +155,7 @@ export function ApprovalsPage() {
         <h2 id="others-title" className="mb-3 text-base font-semibold text-ink">{isApprover ? 'อยู่ระหว่างขั้นอื่น' : 'คำขอที่รออนุมัติ'}</h2>
         {others.length ? (
           <div className="space-y-3">
-            {others.map((booking) => <RequestCard key={booking.bookingId} booking={booking} rooms={rooms} compact />)}
+            {others.map((booking) => <RequestCard key={booking.bookingId} booking={booking} rooms={rooms} compact {...(user.role === 'admin' ? { onEdit: setEditing } : {})} />)}
           </div>
         ) : (
           loaded && <p className="rounded-card bg-surface-sunken px-4 py-6 text-center text-sm text-ink-muted ring-1 ring-inset ring-line">ไม่มีคำขอค้างในขั้นอื่น <Link to="/calendar" className="font-medium text-brand hover:underline">ดูปฏิทินการจอง</Link></p>
@@ -158,7 +165,7 @@ export function ApprovalsPage() {
   );
 }
 
-function RequestCard({ booking, rooms, compact = false, children }: { booking: DemoBooking; rooms: DemoRoom[]; compact?: boolean; children?: React.ReactNode }) {
+function RequestCard({ booking, rooms, compact = false, onEdit, children }: { booking: DemoBooking; rooms: DemoRoom[]; compact?: boolean; onEdit?: (booking: DemoBooking) => void; children?: React.ReactNode }) {
   const room = rooms.find((item) => item.roomId === booking.roomId);
   const lookups = useLookups();
   const [formOpen, setFormOpen] = useState(false);
@@ -178,9 +185,16 @@ function RequestCard({ booking, rooms, compact = false, children }: { booking: D
             <h3 className="text-[17px] font-semibold text-ink">{booking.title || 'ไม่ระบุเรื่อง'}</h3>
             <p className="mt-0.5 text-sm text-ink">{dateText(booking.dateKey)} เวลา {timeText(booking.startMin)}–{timeText(booking.endMin)} น.</p>
           </div>
-          <button type="button" onClick={() => setFormOpen(true)} className="inline-flex min-h-10 items-center gap-1.5 rounded-control px-3 text-sm font-medium text-brand ring-1 ring-brand-border transition-colors hover:bg-brand-soft">
-            <FileText className="size-4" aria-hidden="true" />ดูแบบฟอร์มที่ผู้จองกรอก
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => setFormOpen(true)} className="inline-flex min-h-10 items-center gap-1.5 rounded-control px-3 text-sm font-medium text-brand ring-1 ring-brand-border transition-colors hover:bg-brand-soft">
+              <FileText className="size-4" aria-hidden="true" />ดูแบบฟอร์มที่ผู้จองกรอก
+            </button>
+            {onEdit && (
+              <button type="button" onClick={() => onEdit(booking)} className="inline-flex min-h-10 items-center gap-1.5 rounded-control px-3 text-sm font-medium text-ink-muted ring-1 ring-line transition-colors hover:text-ink hover:ring-ink-subtle">
+                <Pencil className="size-4" aria-hidden="true" />แก้ไข / ลบ
+              </button>
+            )}
+          </div>
         </div>
         {!compact && (
           <dl className="mt-4 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
@@ -191,6 +205,11 @@ function RequestCard({ booking, rooms, compact = false, children }: { booking: D
             {facilities.length > 0 && <Info label="ขอใช้">{facilities.join(', ')}</Info>}
             {booking.note && <Info label="รายละเอียด">{booking.note}</Info>}
           </dl>
+        )}
+        {booking.attachment && (
+          <div className="mt-3 max-w-md">
+            <AttachmentChip meta={booking.attachment} to={attachmentPagePath(booking.bookingId)} />
+          </div>
         )}
         <ApprovalProgress booking={booking} className="mt-4" />
         {children}

@@ -6,6 +6,7 @@ import {
   bookableDayCount,
   businessWindow,
   canCancelBooking,
+  earliestBackdateKey,
   validateBookingRules,
 } from '../domain/booking-rules';
 import { DEFAULT_SYSTEM_SETTINGS, type SystemSettings } from '../schemas/settings';
@@ -78,18 +79,39 @@ describe('กฎการตรวจคำขอจอง', () => {
     expect(codes(request({ dateKey: '2026-11-01' }))).toContain('DAY_NOT_BOOKABLE');
   });
 
-  it('พนักงานจองย้อนหลังไม่ได้ แต่ผู้ดูแลทำได้เมื่อเปิดสิทธิ์', () => {
+  it('ปิดการจองย้อนหลัง (0 วัน): พนักงานจองย้อนหลังไม่ได้ แต่ผู้ดูแลทำได้เมื่อเปิดสิทธิ์', () => {
+    const off: SystemSettings = { ...DEFAULT_SYSTEM_SETTINGS, backdateDays: 0 };
     const past = request({ dateKey: '2026-10-27', startMin: 600, endMin: 660 });
-    expect(codes(past)).toContain('IN_THE_PAST');
-    expect(codes(past, context({ isAdmin: true }))).not.toContain('IN_THE_PAST');
+    expect(codes(past, context({ settings: off }))).toContain('IN_THE_PAST');
+    expect(codes(past, context({ isAdmin: true, settings: off }))).not.toContain('IN_THE_PAST');
 
-    const noBackdate: SystemSettings = { ...DEFAULT_SYSTEM_SETTINGS, allowAdminBackdate: false };
+    const noBackdate: SystemSettings = { ...off, allowAdminBackdate: false };
     expect(codes(past, context({ isAdmin: true, settings: noBackdate }))).toContain('IN_THE_PAST');
   });
 
-  it('เวลาที่ผ่านไปแล้วของ "วันนี้" ก็ถือว่าย้อนหลัง', () => {
+  it('เวลาที่ผ่านไปแล้วของ "วันนี้" ก็ถือว่าย้อนหลัง เมื่อปิดการจองย้อนหลัง', () => {
+    const off: SystemSettings = { ...DEFAULT_SYSTEM_SETTINGS, backdateDays: 0 };
     // ตอนนี้ 09:00 ของวันที่ 28 — จอง 08:00 วันเดียวกันคือย้อนหลัง
-    expect(codes(request({ startMin: 480, endMin: 540 }))).toContain('IN_THE_PAST');
+    expect(codes(request({ startMin: 480, endMin: 540 }), context({ settings: off }))).toContain('IN_THE_PAST');
+  });
+
+  it('ทุกคนบันทึกย้อนหลังได้ภายในจำนวนวันที่ตั้ง (นับตามปฏิทินไทย) เกินกว่านั้นไม่ได้', () => {
+    const week: SystemSettings = { ...DEFAULT_SYSTEM_SETTINGS, backdateDays: 7 };
+    // วันนี้ 08:00 (ผ่านไปแล้ว) และ 21 ต.ค. (ย้อน 7 วันพอดี) ได้
+    expect(codes(request({ startMin: 480, endMin: 540 }), context({ settings: week }))).not.toContain('IN_THE_PAST');
+    expect(codes(request({ dateKey: '2026-10-21' }), context({ settings: week }))).not.toContain('IN_THE_PAST');
+    // 20 ต.ค. ย้อน 8 วัน — เกิน
+    const tooOld = validateBookingRules(request({ dateKey: '2026-10-20' }), context({ settings: week }));
+    expect(tooOld.ok).toBe(false);
+    if (!tooOld.ok) expect(tooOld.issues.find((i) => i.code === 'IN_THE_PAST')?.message).toBe('จองย้อนหลังได้ไม่เกิน 7 วัน');
+    // ค่าเริ่มต้นเปิดไว้ 7 วัน
+    expect(DEFAULT_SYSTEM_SETTINGS.backdateDays).toBe(7);
+  });
+
+  it('ขอบวันตามเวลาไทย: 00:30 ของวันที่ 29 (ไทย) ยังเป็นวันที่ 28 ใน UTC แต่ต้องนับจากวันที่ 29', () => {
+    const now = new Date('2026-10-28T17:30:00Z'); // 29 ต.ค. 00:30 น. เวลาไทย
+    expect(earliestBackdateKey(now, 1)).toBe('2026-10-28');
+    expect(earliestBackdateKey(now, 0)).toBe('9999-12-31');
   });
 
   it('บังคับจองล่วงหน้าตามค่าที่ตั้ง', () => {

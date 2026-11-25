@@ -16,12 +16,16 @@ import { validateBookingRequest, validateAvailabilityInput, type BookingRequest 
 import { validateBookingRules } from '@shared/domain/booking-rules';
 import { findConflicts } from '@shared/domain/overlap';
 import { readLocal, writeLocal } from '../storage';
+import {
+  ATTACHMENT_LOCAL_MAX_BYTES, validateAttachmentUpload, type AttachmentFile, type AttachmentMeta, type AttachmentUpload,
+} from '@shared/schemas/attachment';
 import { busySlotsFor, publicSlotsBetween } from '@shared/domain/availability';
 import {
   GUEST_BOOKINGS_PER_HOUR, TRACKING_MISSES_PER_HOUR, guestAccountId, guestRequesterIssues, normalizeTrackingCode,
   trackingCodeFromBytes, validateScheduleRange,
 } from '@shared/schemas/guest';
 import { canCancelBooking } from '@shared/domain/booking-rules';
+import { RESET_CONFIRM_PHRASE, adminEditRuleIssues, editConflicts, mergeAdminEdit } from '@shared/domain/admin-booking';
 import { approvedSlotsOn } from '@shared/domain/room-status';
 import { ApiError, type AdminUser, type SessionUser, type Transport, type VersionResult } from './types';
 import { activeAnnouncements, validateAnnouncementInput, type Announcement } from '@shared/schemas/announcement';
@@ -83,6 +87,8 @@ export interface DemoBooking {
   createdAt?: string;
   /** รหัสติดตามสถานะ — ส่งให้เฉพาะเจ้าของและผู้ดูแล (คนอื่นได้ '') */
   trackingCode?: string;
+  /** ชื่อ/ชนิด/ขนาดเอกสารแนบ (ตัวไฟล์ต้องขอผ่าน bookingAttachment / trackAttachment) */
+  attachment?: AttachmentMeta | null;
 }
 
 /** รหัสติดตามจากตัวสุ่มของเบราว์เซอร์ (crypto) เหมือนที่ Apps Script ใช้ UUID v4 */
@@ -343,6 +349,41 @@ function saveState(state: DemoState): void {
   );
 }
 
+/**
+ * ไฟล์แนบในโหมดเบราว์เซอร์ — แยกคีย์จากการจอง เพราะไฟล์ใหญ่ และ localStorage จุได้ราว 5 MB ทั้งหมด
+ * (จึงจำกัดไฟล์ละ 1 MB ในโหมดนี้ ส่วน Apps Script รับได้ 5 MB)
+ */
+const ATTACHMENT_STORAGE_KEY = 'mrb.local-attachments.v1';
+
+function readAttachments(): Record<string, AttachmentFile> {
+  try {
+    const parsed = JSON.parse(readLocal(ATTACHMENT_STORAGE_KEY) ?? '{}') as unknown;
+    return parsed && typeof parsed === 'object' ? parsed as Record<string, AttachmentFile> : {};
+  } catch {
+    return {};
+  }
+}
+
+function removeAttachment(bookingId: string): void {
+  const all = readAttachments();
+  if (!(bookingId in all)) return;
+  delete all[bookingId];
+  try { window.localStorage.setItem(ATTACHMENT_STORAGE_KEY, JSON.stringify(all)); } catch { /* ลบไม่ได้ก็แค่เหลือไฟล์ค้าง */ }
+}
+
+/** ข้อมูลก่อนล้างล่าสุด (โหมดเบราว์เซอร์) — กู้คืนได้ด้วยมือถ้ากดพลาด */
+const RESET_BACKUP_KEY = 'mrb.reset-backup.v1';
+
+function storeAttachment(bookingId: string, upload: AttachmentUpload): void {
+  const all = readAttachments();
+  all[bookingId] = { name: upload.name, mimeType: upload.mimeType, size: upload.size, dataBase64: upload.dataBase64 };
+  try {
+    window.localStorage.setItem(ATTACHMENT_STORAGE_KEY, JSON.stringify(all));
+  } catch {
+    throw new ApiError('VALIDATION', 'พื้นที่เก็บไฟล์ในเบราว์เซอร์เต็มแล้ว (โหมดทดลองเก็บไฟล์ในเครื่อง) ลองไฟล์ที่เล็กลง หรือจองโดยไม่แนบไฟล์');
+  }
+}
+
 function createState(users: DemoUser[]): DemoState {
   return {
     settings: { ...DEFAULT_SYSTEM_SETTINGS },
@@ -460,7 +501,9 @@ export function createDemoTransport(): Transport {
   }
 
   /** บันทึกการจองในนามผู้ใช้ที่ล็อกอินหรือผู้จองทั่วไป — กฎเดียวกับ createBookingAs_ ฝั่ง Apps Script */
-  function createAs(user: SessionUser, input: BookingRequest) {
+  function createAs(user: SessionUser, input: BookingRequest, rawAttachment?: unknown) {
+    const upload = validateAttachmentUpload(rawAttachment, ATTACHMENT_LOCAL_MAX_BYTES);
+    if (!upload.ok) throw new ApiError('VALIDATION', upload.issues[0]!.message, upload.issues);
     if (!input.termsAccepted) throw new ApiError('VALIDATION', 'กรุณายอมรับเงื่อนไขการใช้ห้องประชุม');
     if (unknownLookupKeys(liveLookups(), 'facility', input.requestedFacilities).length > 0) {
       throw new ApiError('VALIDATION', 'มีอุปกรณ์ที่ถูกปิดใช้ไปแล้ว กรุณาเลือกใหม่');
@@ -483,9 +526,22 @@ export function createDemoTransport(): Transport {
       ...input, customLocation: openLocation ? input.customLocation : '', bookingId: `demo-bk-${Date.now()}`,
       status: needsApproval ? 'pending' : 'confirmed', approvalStep: needsApproval ? 1 : 0, approvalLog: [],
       userEmail: user.email, userName: user.displayName, createdAt: new Date().toISOString(), trackingCode: newTrackingCode(),
+      attachment: upload.value ? { name: upload.value.name, mimeType: upload.value.mimeType, size: upload.value.size } : null,
     };
+    if (upload.value) storeAttachment(booking.bookingId, upload.value);
     state.bookings.push(booking); changed();
     return { booking, trackingCode: booking.trackingCode! };
+  }
+
+  function attachmentOf(booking: DemoBooking): AttachmentFile {
+    const file = booking.attachment ? readAttachments()[booking.bookingId] : undefined;
+    if (!file) throw new ApiError('NOT_FOUND', booking.attachment ? 'ไม่พบไฟล์ในเบราว์เซอร์นี้ (โหมดทดลองเก็บไฟล์ไว้ในเครื่องที่จองเท่านั้น)' : 'คำขอนี้ไม่มีเอกสารแนบ');
+    return file;
+  }
+
+  function lineUnavailable(_payload: unknown, token: string): never {
+    requireAdmin(token);
+    throw new ApiError('NOT_CONFIGURED', 'โหมดทดลองในเบราว์เซอร์ส่ง LINE ไม่ได้ ต้องติดตั้ง Apps Script และใส่โทเคน LINE ก่อน (ดู docs/03-แจ้งเตือน-LINE.md)');
   }
 
   const handlers: Record<string, (payload: never, token: string) => unknown> = {
@@ -634,7 +690,7 @@ export function createDemoTransport(): Transport {
       const user = userFromToken(token);
       const parsed = validateBookingRequest(payload);
       if (!parsed.ok) throw new ApiError('VALIDATION', parsed.issues.map((issue) => issue.message).join(' · '), parsed.issues);
-      return createAs(user, parsed.value);
+      return createAs(user, parsed.value, (payload as { attachment?: unknown } | null)?.attachment);
     },
     publicBootstrap: () => ({ settings: state.settings, dataVersion: state.dataVersion, serverTime: new Date().toISOString() }),
     publicSchedule: (payload: unknown) => {
@@ -655,7 +711,7 @@ export function createDemoTransport(): Transport {
       const result = createAs({
         email: guestAccountId(input.requesterPhone), displayName: input.bookerName, department: input.department,
         position: input.requesterPosition, role: 'staff', status: 'active', allowedRoomIds: [],
-      }, input);
+      }, input, (payload as { attachment?: unknown } | null)?.attachment);
       count('guest-bookings');
       return result;
     },
@@ -663,6 +719,25 @@ export function createDemoTransport(): Transport {
       const booking = findByCode(payload?.code);
       return { booking: { ...booking }, room: state.rooms.find((room) => room.roomId === booking.roomId) ?? null };
     },
+    trackAttachment: (payload: { code?: unknown }) => ({ attachment: attachmentOf(findByCode(payload?.code)) }),
+    bookingAttachment: (payload: { bookingId?: unknown }, token) => {
+      const user = userFromToken(token);
+      const booking = state.bookings.find((item) => item.bookingId === payload?.bookingId);
+      if (!booking) throw new ApiError('NOT_FOUND', 'ไม่พบรายการจองนี้');
+      // กฎเดียวกับ canOpenAttachment_ ฝั่ง Apps Script
+      if (!(user.role === 'admin' || canSeeAllBookings(user.role) || booking.userEmail === user.email)) {
+        throw new ApiError('FORBIDDEN', 'บัญชีนี้ไม่มีสิทธิ์เปิดเอกสารของคำขอนี้ (เปิดได้เฉพาะผู้จอง ผู้ลงนาม และผู้ดูแลระบบ)');
+      }
+      return { attachment: attachmentOf(booking), booking: viewFor(booking, user) };
+    },
+    // โหมดเบราว์เซอร์ไม่มี server จึงส่ง LINE ไม่ได้ (โทเคนต้องอยู่ฝั่ง server เท่านั้น) — หน้าตั้งค่าแสดงตัวอย่างการ์ดแทน
+    lineStatus: (_payload: unknown, token) => {
+      requireAdmin(token);
+      return { demo: true, hasToken: false, targets: [], siteUrl: '', captureUntil: '', seen: [], last: null };
+    },
+    lineSave: lineUnavailable,
+    lineCapture: lineUnavailable,
+    lineTest: lineUnavailable,
     trackCancel: (payload: { code?: unknown; reason?: unknown }) => {
       const booking = findByCode(payload?.code);
       if (!['pending', 'confirmed'].includes(booking.status)) throw new ApiError('CONFLICT', 'คำขอนี้ยกเลิกไม่ได้แล้ว');
@@ -707,6 +782,60 @@ export function createDemoTransport(): Transport {
       if (parsed.value.decision === 'reject') booking.note = `${booking.note}${booking.note ? '\n' : ''}ผลพิจารณา: ${parsed.value.reason.trim()}`;
       state.dataVersion += 1; saveState(state);
       return { booking, nextStep: result.nextStep };
+    },
+    // ผู้ดูแลแก้/ลบ/ล้าง — กติกาเดียวกับ 62_AdminBookings.gs
+    adminUpdateBooking: (payload: unknown, token) => {
+      const admin = requireAdmin(token);
+      const bookingId = String((payload as { bookingId?: unknown } | null)?.bookingId ?? '');
+      const booking = state.bookings.find((item) => item.bookingId === bookingId);
+      if (!booking) throw new ApiError('NOT_FOUND', 'ไม่พบรายการจอง อาจถูกลบไปแล้ว');
+      const merged = mergeAdminEdit({
+        bookerName: booking.bookerName || booking.userName, title: booking.title, roomId: booking.roomId, dateKey: booking.dateKey,
+        startMin: booking.startMin, endMin: booking.endMin, attendees: booking.attendees, department: booking.department ?? '',
+        requesterPosition: booking.requesterPosition ?? '', requesterPhone: booking.requesterPhone ?? '', note: booking.note ?? '',
+        equipment: booking.equipment ?? [], requestedFacilities: booking.requestedFacilities ?? [], meetingType: booking.meetingType ?? '',
+        extraFurnitureCount: booking.extraFurnitureCount ?? 0, otherFacility: booking.otherFacility ?? '', termsAccepted: true,
+        customLocation: booking.customLocation ?? '',
+      }, payload);
+      if (!merged.ok) throw new ApiError('VALIDATION', merged.issues[0]!.message, merged.issues);
+      const input = merged.value.request;
+      if (merged.value.changes.length === 0) return { booking: viewFor(booking, admin), changed: 0 };
+      const room = state.rooms.find((item) => item.roomId === input.roomId);
+      if (!room) throw new ApiError('NOT_FOUND', 'ไม่พบห้องประชุม');
+      const ruleIssues = adminEditRuleIssues(input, { settings: state.settings, room, now: new Date() });
+      if (ruleIssues.length) throw new ApiError('VALIDATION', ruleIssues.map((issue) => issue.message).join(' · '));
+      const openLocation = isOpenLocationRoom(room);
+      if (openLocation && input.customLocation.trim() === '') throw new ApiError('VALIDATION', 'กรุณาระบุสถานที่');
+      if (!openLocation && editConflicts(state.bookings, bookingId, input).length) {
+        throw new ApiError('CONFLICT', 'เวลาใหม่ชนกับการจองอื่นในห้องนี้ กรุณาเลือกเวลาอื่น');
+      }
+      for (const { field } of merged.value.changes) (booking as unknown as Record<string, unknown>)[field] = input[field];
+      if (!openLocation) booking.customLocation = '';
+      changed();
+      return { booking: viewFor(booking, admin), changed: merged.value.changes.length };
+    },
+    adminDeleteBooking: (payload: { bookingId?: unknown }, token) => {
+      requireAdmin(token);
+      const bookingId = String(payload?.bookingId ?? '');
+      if (!state.bookings.some((item) => item.bookingId === bookingId)) throw new ApiError('NOT_FOUND', 'ไม่พบรายการจอง อาจถูกลบไปแล้ว');
+      state.bookings = state.bookings.filter((item) => item.bookingId !== bookingId);
+      state.reviews = state.reviews.filter((item) => item.bookingId !== bookingId);
+      removeAttachment(bookingId);
+      changed();
+      return { deleted: bookingId };
+    },
+    adminResetBookings: (payload: { confirm?: unknown }, token) => {
+      requireAdmin(token);
+      if (String(payload?.confirm ?? '').trim() !== RESET_CONFIRM_PHRASE) {
+        throw new ApiError('VALIDATION', `พิมพ์คำว่า "${RESET_CONFIRM_PHRASE}" ให้ตรงเพื่อยืนยัน`);
+      }
+      const cleared = { Bookings: state.bookings.length, Reviews: state.reviews.length };
+      // สำรองไว้ในเครื่องก่อน (แทนชีตสำรองของ Apps Script)
+      writeLocal(RESET_BACKUP_KEY, JSON.stringify({ at: new Date().toISOString(), bookings: state.bookings, reviews: state.reviews }));
+      state.bookings = [];
+      state.reviews = [];
+      changed();
+      return { backups: cleared.Bookings + cleared.Reviews > 0 ? ['สำรองไว้ในเบราว์เซอร์เครื่องนี้'] : [], cleared };
     },
     announcements: (_payload, token) => {
       userFromToken(token);

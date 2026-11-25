@@ -140,6 +140,11 @@ export const SHEET_SPECS: SheetSpec[] = [
       'meetingType',
       // รหัสติดตามสถานะ (สุ่ม เดาไม่ได้) — ผู้จองทั่วไปใช้ดูสถานะ พิมพ์แบบฟอร์ม และยกเลิกคำขอของตัวเอง
       'trackingCode',
+      // เอกสารแนบ 1 ไฟล์: รหัสไฟล์ใน Google Drive (ไฟล์ส่วนตัว ไม่แชร์) — ห้ามส่งรหัสนี้ให้หน้าเว็บ
+      'attachmentFileId',
+      'attachmentName',
+      'attachmentMime',
+      'attachmentSize',
     ],
   },
   {
@@ -211,7 +216,8 @@ export const SETTING_DESCRIPTIONS: Record<keyof SystemSettings, string> = {
   minLeadMinutes: 'ต้องจองล่วงหน้าอย่างน้อยกี่นาที (0 = จองใช้ทันทีได้)',
   cancelCutoffMinutes: 'ยกเลิกได้ก่อนเวลาเริ่มอย่างน้อยกี่นาที',
   approvalRequired: 'TRUE = การจองต้องรออนุมัติก่อน, FALSE = ยืนยันทันที',
-  allowAdminBackdate: 'TRUE = ผู้ดูแลจองย้อนหลังได้',
+  allowAdminBackdate: 'TRUE = ผู้ดูแลจองย้อนหลังได้ (ไม่จำกัดวัน)',
+  backdateDays: 'ทุกคนบันทึกการใช้ห้องย้อนหลังได้กี่วัน 0 = ไม่ได้ (ยังต้องผ่านการอนุมัติ)',
   maxActiveBookingsPerUser: 'จำนวนการจองที่ยังไม่สิ้นสุดสูงสุดต่อคน',
   reminderLeadMinutes: 'แจ้งเตือนก่อนเริ่มประชุมกี่นาที',
 };
@@ -276,6 +282,7 @@ export function rowsToSettings(rows: readonly CellValue[][]): ValidationResult<S
       'allowAdminBackdate',
       DEFAULT_SYSTEM_SETTINGS.allowAdminBackdate,
     ),
+    backdateDays: readNumber(record, 'backdateDays', DEFAULT_SYSTEM_SETTINGS.backdateDays),
     maxActiveBookingsPerUser: readNumber(
       record,
       'maxActiveBookingsPerUser',

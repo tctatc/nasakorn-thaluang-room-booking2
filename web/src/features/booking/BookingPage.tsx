@@ -1,8 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  AirVent, CalendarDays, Check, Clock3, DoorOpen, FileText, MapPin, Mic, Package, Projector, Send, Users, Volume2, Wifi, type LucideIcon,
+  AirVent, CalendarDays, Check, Clock3, DoorOpen, FileText, History, MapPin, Mic, Package, Paperclip, Projector, Send, Users, Volume2, Wifi, X, type LucideIcon,
 } from 'lucide-react';
+import {
+  ATTACHMENT_ACCEPT, ATTACHMENT_LOCAL_MAX_BYTES, ATTACHMENT_MAX_BYTES, ATTACHMENT_TYPES_TEXT, formatFileSize, validateAttachmentUpload,
+} from '@shared/schemas/attachment';
+import { readFileAsBase64 } from '../../lib/attachment';
+import { attachmentIcon } from '../../components/ui/AttachmentChip';
 import { businessWindow } from '@shared/domain/booking-rules';
 import { conflictingSlots, isEndBlocked, isStartBlocked } from '@shared/domain/availability';
 import { addDaysToDateKey, dayOfWeekOfDateKey, toDateKey, toMinutesOfDay } from '@shared/time/bangkok';
@@ -70,6 +75,17 @@ function upcomingBookableDays(today: string, nowMinute: number, settings: System
   return days;
 }
 
+/** วันทำการย้อนหลัง ล่าสุดก่อน (เมื่อวาน, วันก่อน ...) ไม่เกินวันแรกที่ยังบันทึกย้อนหลังได้ */
+function recentBookableDays(today: string, earliest: string, settings: SystemSettings): string[] {
+  const days: string[] = [];
+  for (let offset = 1; offset <= 62; offset += 1) {
+    const key = addDaysToDateKey(today, -offset);
+    if (key < earliest) break;
+    if (settings.bookableWeekdays.includes(dayOfWeekOfDateKey(key))) days.push(key);
+  }
+  return days;
+}
+
 export function BookingPage() {
   const { api, token, settings, user } = useApp();
   const rules = settings!;
@@ -81,13 +97,21 @@ export function BookingPage() {
   const today = toDateKey(new Date());
   const nowMinute = toMinutesOfDay(new Date());
   const days = useMemo(() => upcomingBookableDays(today, nowMinute, rules), [today, rules]);
+  // บันทึกย้อนหลัง: ทุกคนได้ตาม backdateDays (ยังต้องอนุมัติ) — ผู้ดูแลที่เปิดสิทธิ์ย้อนได้ไม่จำกัด (ปฏิทินแสดง 14 วัน)
+  const adminBackdate = user?.role === 'admin' && rules.allowAdminBackdate;
+  const backdateDays = Math.max(0, Math.floor(Number(rules.backdateDays) || 0));
+  const earliest = adminBackdate ? addDaysToDateKey(today, -Math.max(backdateDays, 14)) : addDaysToDateKey(today, -backdateDays);
+  const pastDays = useMemo(() => recentBookableDays(today, earliest, rules), [today, earliest, rules]);
+  const validDate = (key: string | null): key is string =>
+    key !== null && /^\d{4}-\d{2}-\d{2}$/.test(key) && (adminBackdate || key >= earliest);
 
   const [rooms, setRooms] = useState<DemoRoom[]>([]);
   const [roomOrder, setRoomOrder] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [roomId, setRoomId] = useState(() => params.get('room') || '');
-  const [dateKey, setDateKey] = useState(() => (days.includes(params.get('date') ?? '') ? params.get('date')! : days[0] ?? today));
+  const [dateKey, setDateKey] = useState(() => (validDate(params.get('date')) ? params.get('date')! : days[0] ?? today));
+  const [showPast, setShowPast] = useState(() => dateKey < today);
   const [start, setStart] = useState(() => (isTime(params.get('start')) ? params.get('start')! : '09:00'));
   const [end, setEnd] = useState(() => (isTime(params.get('end')) ? params.get('end')! : '10:00'));
   // ช่องดักบอท — ซ่อนจากคนจริง ถ้ามีค่าเซิร์ฟเวอร์จะปฏิเสธ
@@ -110,6 +134,31 @@ export function BookingPage() {
   const [extraFurnitureCount, setExtraFurnitureCount] = useState('0');
   const [otherFacility, setOtherFacility] = useState('');
   const [termsAccepted, setTermsAccepted] = useState(false);
+  // เอกสารแนบ 1 ไฟล์ (ไม่บังคับ) — อ่านและตรวจทันทีที่เลือก ผู้ใช้จะรู้ตั้งแต่ตอนนั้นว่าไฟล์ใช้ได้ไหม
+  const [attachment, setAttachment] = useState<{ name: string; dataBase64: string; mimeType: string; size: number } | null>(null);
+  const [attachmentError, setAttachmentError] = useState('');
+  const [readingFile, setReadingFile] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const maxAttachmentBytes = api.mode === 'demo' ? ATTACHMENT_LOCAL_MAX_BYTES : ATTACHMENT_MAX_BYTES;
+  const chooseFile = async (file: File | undefined) => {
+    setAttachmentError('');
+    if (!file) return;
+    if (file.size > maxAttachmentBytes) {
+      setAttachmentError(`ไฟล์ใหญ่เกิน ${formatFileSize(maxAttachmentBytes)} (ไฟล์นี้ ${formatFileSize(file.size)}) กรุณาย่อไฟล์หรือสแกนให้ความละเอียดต่ำลง`);
+      return;
+    }
+    setReadingFile(true);
+    try {
+      const parsed = validateAttachmentUpload({ name: file.name, dataBase64: await readFileAsBase64(file) }, maxAttachmentBytes);
+      if (!parsed.ok) setAttachmentError(parsed.issues[0]!.message);
+      else if (parsed.value) setAttachment({ name: parsed.value.name, dataBase64: parsed.value.dataBase64, mimeType: parsed.value.mimeType, size: parsed.value.size });
+    } catch (e) {
+      setAttachmentError(e instanceof Error ? e.message : 'อ่านไฟล์ไม่ได้');
+    } finally {
+      setReadingFile(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
   // ผู้ใช้เลือกเวลาเองแล้ว (หรือมากับลิงก์จากปฏิทิน) ห้ามระบบเลื่อนให้อีก
   const timeTouched = useRef(isTime(params.get('start')) && isTime(params.get('end')));
 
@@ -153,11 +202,14 @@ export function BookingPage() {
   const attendeeCount = Number(attendees) || 0;
   const overCapacity = room !== undefined && !openLocation && attendeeCount > capacity;
   const dayClosed = !rules.bookableWeekdays.includes(dayOfWeekOfDateKey(dateKey));
+  const backdated = dateKey < today || (dateKey === today && startMin < nowMinute);
+  const tooOld = !adminBackdate && dateKey < earliest;
 
   const missing = [
     roomId === '' && 'เลือกห้อง',
     openLocation && customLocation.trim() === '' && 'ระบุสถานที่',
     roomConflict && 'เลือกเวลาที่ห้องว่าง',
+    tooOld && 'เลือกวันที่ใหม่',
     bookerName.trim() === '' && 'กรอกชื่อผู้จอง',
     position.trim() === '' && 'ตำแหน่ง',
     department.trim() === '' && 'หน่วยงาน',
@@ -167,7 +219,7 @@ export function BookingPage() {
   ].filter((item): item is string => typeof item === 'string');
   const done = {
     room: roomId !== '' && (!openLocation || customLocation.trim() !== ''),
-    time: !roomConflict && !dayClosed,
+    time: !roomConflict && !dayClosed && !tooOld,
     booker: [bookerName, position, department, phone, title].every((value) => value.trim() !== '') && attendeeCount > 0 && !overCapacity,
     terms: termsAccepted,
   };
@@ -189,6 +241,7 @@ export function BookingPage() {
         bookerName: fullName, title, roomId, dateKey, startMin, endMin, attendees: attendeeCount,
         department, requesterPosition: position, requesterPhone: phone, note, equipment: [], customLocation: openLocation ? customLocation : '',
         requestedFacilities, extraFurnitureCount: Number(extraFurnitureCount), otherFacility, termsAccepted, meetingType,
+        ...(attachment ? { attachment: { name: attachment.name, dataBase64: attachment.dataBase64 } } : {}),
       };
       // ไม่ได้เข้าสู่ระบบ = ผู้จองทั่วไป (กรอกชื่อ เบอร์ แผนก) ได้รหัสติดตามไว้ดูสถานะ
       const { trackingCode } = user ? await api.createBooking(token, request) : await api.guestBooking({ ...request, website });
@@ -267,9 +320,23 @@ export function BookingPage() {
               <label className={labelClass} htmlFor="date">วันที่</label>
             </div>
             <div className="-mx-5 flex snap-x gap-2 overflow-x-auto px-5 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
-              {days.map((key) => {
+              {pastDays.length > 0 && (
+                <button
+                  type="button"
+                  aria-pressed={showPast}
+                  onClick={() => setShowPast((value) => !value)}
+                  className={cn(
+                    'flex w-16 shrink-0 snap-start flex-col items-center justify-center gap-0.5 rounded-2xl py-2 text-xs font-medium ring-1 ring-inset transition-colors duration-150',
+                    showPast ? 'bg-warn-soft text-warn ring-warn/40' : 'bg-surface text-ink-muted ring-line hover:text-brand hover:ring-brand-border',
+                  )}
+                >
+                  <History className="size-5" aria-hidden="true" />
+                  {showPast ? 'ซ่อน' : 'ย้อนหลัง'}
+                </button>
+              )}
+              {[...(showPast ? [...pastDays].reverse() : []), ...days].map((key) => {
                 const selected = key === dateKey;
-                const label = key === today ? 'วันนี้' : key === addDaysToDateKey(today, 1) ? 'พรุ่งนี้' : thaiDate(key, { weekday: 'short' });
+                const label = key === today ? 'วันนี้' : key === addDaysToDateKey(today, 1) ? 'พรุ่งนี้' : key === addDaysToDateKey(today, -1) ? 'เมื่อวาน' : thaiDate(key, { weekday: 'short' });
                 return (
                   <button
                     key={key}
@@ -291,7 +358,7 @@ export function BookingPage() {
               <span
                 className={cn(
                   'relative flex shrink-0 items-center gap-2 rounded-2xl px-3 ring-1 ring-inset transition-colors duration-150 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand',
-                  days.includes(dateKey) ? 'ring-line text-ink-muted' : 'bg-brand-soft text-brand ring-brand',
+                  days.includes(dateKey) || (showPast && pastDays.includes(dateKey)) ? 'ring-line text-ink-muted' : 'bg-brand-soft text-brand ring-brand',
                 )}
               >
                 <CalendarDays className="size-4 shrink-0" aria-hidden="true" />
@@ -299,7 +366,7 @@ export function BookingPage() {
                   id="date"
                   type="date"
                   required
-                  min={today}
+                  {...(adminBackdate ? {} : { min: earliest })}
                   value={dateKey}
                   onChange={(e) => e.target.value && setDateKey(e.target.value)}
                   className="min-h-11 w-[8.5rem] bg-transparent text-sm text-inherit outline-none"
@@ -308,6 +375,16 @@ export function BookingPage() {
             </div>
             {dayClosed && (
               <p className="mt-2 text-sm font-medium text-warn">วันนี้ไม่เปิดให้จอง เลือกวันทำการอื่น</p>
+            )}
+            {tooOld ? (
+              <p role="alert" className="mt-2 text-sm font-medium text-danger">
+                {backdateDays > 0 ? `จองย้อนหลังได้ไม่เกิน ${backdateDays} วัน` : 'ระบบไม่เปิดให้จองย้อนหลัง'} เลือกวันใหม่
+              </p>
+            ) : backdated && !dayClosed && (
+              <p className="mt-3 flex items-start gap-2 rounded-xl bg-warn-soft px-3 py-2.5 text-sm text-warn">
+                <History className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                <span>บันทึกการใช้ห้องย้อนหลัง คำขอนี้ยังต้องผ่านการอนุมัติเหมือนการจองปกติ</span>
+              </p>
             )}
 
             <div className="mt-5 grid grid-cols-2 gap-3">
@@ -411,6 +488,30 @@ export function BookingPage() {
               <label className={labelClass} htmlFor="note">รายละเอียดเพิ่มเติม <span className="font-normal text-ink-subtle">(ถ้ามี)</span></label>
               <textarea className={cn(inputClass, 'min-h-24 py-2.5')} id="note" maxLength={1000} value={note} onChange={(e) => setNote(e.target.value)} placeholder="วาระการประชุมหรือข้อมูลที่ต้องแจ้งผู้ดูแล" />
             </div>
+            <div className="mt-4">
+              <p className={labelClass}>เอกสารแนบ <span className="font-normal text-ink-subtle">(ถ้ามี เช่น บันทึกข้อความ วาระการประชุม)</span></p>
+              {attachment ? (
+                <div className="flex min-h-14 items-center gap-3 rounded-control border border-ok-border bg-ok-soft px-3 py-2">
+                  {(() => { const Icon = attachmentIcon(attachment.mimeType); return <Icon className="size-5 shrink-0 text-ok" aria-hidden="true" />; })()}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-ink">{attachment.name}</span>
+                    <span className="block text-xs text-ink-muted">{formatFileSize(attachment.size)} · แนบไปกับคำขอ ผู้อนุมัติเปิดได้จาก LINE</span>
+                  </span>
+                  <button type="button" onClick={() => setAttachment(null)} aria-label={`เอาไฟล์ ${attachment.name} ออก`} className="grid size-10 shrink-0 place-items-center rounded-control text-ink-muted hover:bg-surface hover:text-danger">
+                    <X className="size-5" aria-hidden="true" />
+                  </button>
+                </div>
+              ) : (
+                <label htmlFor="attachment" className="flex min-h-14 cursor-pointer items-center justify-center gap-2 rounded-control border border-dashed border-line-strong px-3 text-sm font-medium text-ink-muted transition-colors duration-150 hover:border-brand-border hover:bg-brand-soft/40 hover:text-brand has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand">
+                  <input ref={fileInputRef} id="attachment" type="file" accept={ATTACHMENT_ACCEPT} className="sr-only" aria-describedby="attachment-hint" onChange={(e) => void chooseFile(e.target.files?.[0])} />
+                  <Paperclip className="size-4" aria-hidden="true" />
+                  {readingFile ? 'กำลังอ่านไฟล์…' : 'เลือกไฟล์แนบ'}
+                </label>
+              )}
+              <p id="attachment-hint" className={cn('mt-1 text-xs', attachmentError ? 'font-medium text-danger' : 'text-ink-subtle')} role={attachmentError ? 'alert' : undefined}>
+                {attachmentError || `${ATTACHMENT_TYPES_TEXT} 1 ไฟล์ ไม่เกิน ${formatFileSize(maxAttachmentBytes)} · เปิดดูได้เฉพาะผู้จอง ผู้อนุมัติ และผู้ดูแลระบบ`}
+              </p>
+            </div>
           </Section>
 
           <Section step={4} title="อุปกรณ์และเงื่อนไข" hint="เลือกเฉพาะที่ต้องการให้เตรียม" done={done.terms}>
@@ -509,7 +610,7 @@ export function BookingPage() {
           </p>
           <div className="mt-2 flex gap-3 lg:mt-0 lg:flex-col-reverse lg:gap-2 lg:px-5 lg:pb-5">
             <Button variant="secondary" onClick={() => nav(-1)}>กลับ</Button>
-            <Button form="booking-form" className="flex-1" type="submit" icon={<Send className="size-4" aria-hidden="true" />} loading={busy} loadingLabel="กำลังบันทึก" disabled={!roomId || !termsAccepted || roomConflict}>
+            <Button form="booking-form" className="flex-1" type="submit" icon={<Send className="size-4" aria-hidden="true" />} loading={busy} loadingLabel="กำลังบันทึก" disabled={!roomId || !termsAccepted || roomConflict || readingFile}>
               ส่งคำขอจอง
             </Button>
           </div>

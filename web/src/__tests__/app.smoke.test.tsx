@@ -510,6 +510,8 @@ describe('ห้องไม่ว่าง: บอกตั้งแต่ต�
     );
     fireEvent.change(screen.getByLabelText('วันที่'), { target: { value: toDateKey(new Date()) } });
     fireEvent.change(screen.getByLabelText('เริ่ม'), { target: { value: '09:00' } });
+    // ตั้งเวลาจบเองด้วย — ถ้ารันช่วงบ่าย เวลาจบเดิมจะเป็นช่วงเย็น ช่วงยาวจนไม่มีเวลาว่างให้เสนอ
+    fireEvent.change(screen.getByLabelText('สิ้นสุด'), { target: { value: '10:00' } });
     const warning = await screen.findByRole('alert', {}, { timeout: 3000 });
     expect(warning.textContent).toContain('ห้องนี้ไม่ว่างเวลา 09:00–10:30 น.');
     await user.click(screen.getByLabelText(/ดูแลรักษาทรัพย์สินของทางราชการ/));

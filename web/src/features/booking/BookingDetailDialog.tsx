@@ -1,18 +1,20 @@
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
-import { FileText, X } from 'lucide-react';
+import { FileText, Pencil, X } from 'lucide-react';
 import { BOOKING_STATUS_LABEL_TH } from '@shared/domain/status';
 import { useLookups } from '../../lib/hooks/useLookups';
 import { isOpenLocationRoom } from '@shared/schemas/room';
 import type { DemoBooking, DemoRoom } from '../../lib/api/demo';
 import { ApprovalProgress } from '../approvals/ApprovalProgress';
+import { AttachmentChip } from '../../components/ui/AttachmentChip';
+import { attachmentPagePath } from '@shared/domain/line-message';
 
 const dateText = (key: string) => new Intl.DateTimeFormat('th-TH', { dateStyle: 'full', timeZone: 'Asia/Bangkok' }).format(new Date(`${key}T12:00:00+07:00`));
 const timeText = (min: number) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
 
 /** รายละเอียดการจองเมื่อกดรายการบนปฏิทิน — ข้อมูลทั้งหมดมาจากแบบฟอร์มที่ผู้จองกรอก */
-export function BookingDetailDialog({ booking, rooms, onClose }: { booking: DemoBooking; rooms: DemoRoom[]; onClose: () => void }) {
+export function BookingDetailDialog({ booking, rooms, onClose, onEdit }: { booking: DemoBooking; rooms: DemoRoom[]; onClose: () => void; /** ผู้ดูแลเท่านั้น */ onEdit?: (booking: DemoBooking) => void }) {
   const closeRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     const trigger = document.activeElement as HTMLElement | null;
@@ -62,11 +64,22 @@ export function BookingDetailDialog({ booking, rooms, onClose }: { booking: Demo
             </div>
           ))}
         </dl>
+        {booking.attachment && (
+          <div className="px-5 pb-4">
+            <p className="mb-1.5 text-sm font-medium text-ink">เอกสารแนบ</p>
+            <AttachmentChip meta={booking.attachment} to={attachmentPagePath(booking.bookingId)} />
+          </div>
+        )}
         <div className="border-t border-line px-5 py-4">
           <p className="mb-2 text-sm font-medium text-ink">การอนุมัติ</p>
           <ApprovalProgress booking={booking} />
         </div>
-        <footer className="flex justify-end border-t border-line px-5 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+        <footer className="flex flex-wrap justify-end gap-2 border-t border-line px-5 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+          {onEdit && (
+            <button type="button" onClick={() => onEdit(booking)} className="mr-auto inline-flex min-h-11 items-center gap-2 rounded-control px-3 text-sm font-medium text-ink-muted ring-1 ring-line hover:text-ink">
+              <Pencil className="size-4" aria-hidden="true" />แก้ไข / ลบ
+            </button>
+          )}
           <Link to={`/reports?booking=${booking.bookingId}`} className="inline-flex min-h-11 items-center gap-2 rounded-control px-3 text-sm font-medium text-brand ring-1 ring-brand-border hover:bg-brand-soft">
             <FileText className="size-4" aria-hidden="true" />ดูแบบฟอร์มคำขอ
           </Link>

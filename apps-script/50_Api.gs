@@ -32,7 +32,10 @@ function doGet(e) {
 function doPost(e) {
   let request;
   try {
-    request = parseRequest_(e);
+    const body = parseBody_(e);
+    // LINE ส่ง webhook มาที่ URL เดียวกัน (ใช้ตอนผู้ดูแลเลือกกลุ่มรับแจ้งเตือน ดู 47_Line.gs)
+    if (isLineWebhook_(body)) return jsonOutput_(handleLineWebhook_(body));
+    request = parseRequest_(body);
   } catch (error) {
     return jsonOutput_(errorEnvelope_(error));
   }
@@ -49,16 +52,19 @@ function doPost(e) {
   }
 }
 
-function parseRequest_(e) {
+function parseBody_(e) {
   if (!e || !e.postData || !e.postData.contents) {
     throw appError_(ERROR_CODES.BAD_REQUEST, 'ไม่พบข้อมูลคำขอ');
   }
-  let body;
   try {
-    body = JSON.parse(e.postData.contents);
+    const body = JSON.parse(e.postData.contents);
+    return body && typeof body === 'object' ? body : {};
   } catch (error) {
     throw appError_(ERROR_CODES.BAD_REQUEST, 'รูปแบบข้อมูลคำขอไม่ถูกต้อง');
   }
+}
+
+function parseRequest_(body) {
   const action = typeof body.action === 'string' ? body.action : '';
   if (action === '') throw appError_(ERROR_CODES.BAD_REQUEST, 'ไม่ได้ระบุคำสั่ง');
 
@@ -85,6 +91,8 @@ function apiHandlers_() {
     guestBooking: function (payload) { return guestBooking_(payload || {}); },
     trackBooking: function (payload) { return trackBooking_(payload || {}); },
     trackCancel: function (payload) { return trackCancel_(payload || {}); },
+    // เอกสารแนบด้วยรหัสติดตาม (ผู้จองทั่วไป) — รหัสติดตามคือกุญแจของคำขอนั้น
+    trackAttachment: function (payload) { return trackAttachment_(payload || {}); },
     login: function (payload) {
       return login_(payload || {});
     },
@@ -115,6 +123,12 @@ function apiHandlers_() {
     cancelBooking: function (payload, token) { return cancelBooking_(authenticate_(token), payload || {}); },
     // ผู้ลงนามแต่ละขั้น (ไม่ใช่ admin) — decideBooking_ ตรวจว่าเป็นขั้นของคนนี้หรือไม่
     decideBooking: function (payload, token) { return decideBooking_(authenticate_(token), payload || {}); },
+    // ผู้ดูแลเท่านั้น: แก้/ลบคำขอที่ส่งมาแล้ว และล้างข้อมูลการจองเพื่อเริ่มบันทึกใหม่ (ดู 62_AdminBookings.gs)
+    adminUpdateBooking: function (payload, token) { return adminUpdateBooking_(requireAdmin_(token), payload || {}); },
+    adminDeleteBooking: function (payload, token) { return adminDeleteBooking_(requireAdmin_(token), payload || {}); },
+    adminResetBookings: function (payload, token) { return adminResetBookings_(requireAdmin_(token), payload || {}); },
+    // เปิดเอกสารแนบ — เฉพาะผู้จอง ผู้ลงนาม และผู้ดูแล (ตรวจใน bookingAttachment_)
+    bookingAttachment: function (payload, token) { return bookingAttachment_(authenticate_(token), payload || {}); },
     announcements: function (payload, token) { return listAnnouncements_(authenticate_(token)); },
     saveAnnouncement: function (payload, token) { return saveAnnouncement_(requireAdmin_(token), payload || {}); },
     archiveAnnouncement: function (payload, token) { return archiveAnnouncement_(requireAdmin_(token), payload || {}); },
@@ -134,6 +148,12 @@ function apiHandlers_() {
     archiveLookup: function (payload, token) { return archiveLookup_(requireAdmin_(token), payload || {}); },
     saveRoom: function (payload, token) { return saveRoom_(requireAdmin_(token), payload || {}); },
     deleteRoom: function (payload, token) { return deleteRoom_(requireAdmin_(token), payload || {}); },
+
+    // แจ้งเตือน LINE — เฉพาะผู้ดูแล (โทเคนไม่เคยถูกส่งกลับ บอกแค่ว่าตั้งแล้วหรือยัง)
+    lineStatus: function (payload, token) { requireAdmin_(token); return lineStatus_(); },
+    lineSave: function (payload, token) { return lineSave_(requireAdmin_(token), payload || {}); },
+    lineCapture: function (payload, token) { return lineCapture_(requireAdmin_(token)); },
+    lineTest: function (payload, token) { return lineTest_(requireAdmin_(token)); },
 
     // จัดการผู้ใช้ — เฉพาะผู้ดูแล
     users: function (payload, token) { requireAdmin_(token); return listUsers_(); },

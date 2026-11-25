@@ -21,3 +21,6 @@ export * from './schemas/review';
 export * from './domain/report';
 export * from './domain/room-status';
 export * from './schemas/guest';
+export * from './schemas/attachment';
+export * from './domain/line-message';
+export * from './domain/admin-booking';

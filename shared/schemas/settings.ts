@@ -24,6 +24,8 @@ export interface SystemSettings {
   approvalRequired: boolean;
   /** ให้ผู้ดูแลจองย้อนหลังได้หรือไม่ (บันทึกลง audit log ทุกครั้ง) */
   allowAdminBackdate: boolean;
+  /** ผู้จองทั่วไปบันทึกการใช้ห้องย้อนหลังได้กี่วัน (0 = ไม่ได้) — ยังต้องผ่านการอนุมัติเหมือนคำขอปกติ */
+  backdateDays: number;
   /** จำกัดจำนวนการจองที่ยังไม่สิ้นสุดต่อคน กัน spam */
   maxActiveBookingsPerUser: number;
   /** แจ้งเตือนก่อนเริ่มประชุมกี่นาที */
@@ -42,6 +44,7 @@ export const DEFAULT_SYSTEM_SETTINGS: SystemSettings = {
   cancelCutoffMinutes: 0,
   approvalRequired: true,
   allowAdminBackdate: true,
+  backdateDays: 7,
   maxActiveBookingsPerUser: 20,
   reminderLeadMinutes: 15,
 };
@@ -109,6 +112,11 @@ export function validateSystemSettings(raw: unknown): ValidationResult<SystemSet
     }),
     allowAdminBackdate: check.boolean('allowAdminBackdate', input.allowAdminBackdate, {
       label: 'สิทธิ์จองย้อนหลังของผู้ดูแล',
+    }),
+    backdateDays: check.integer('backdateDays', input.backdateDays, {
+      label: 'จำนวนวันที่จองย้อนหลังได้',
+      min: 0,
+      max: 60,
     }),
     maxActiveBookingsPerUser: check.integer(
       'maxActiveBookingsPerUser',

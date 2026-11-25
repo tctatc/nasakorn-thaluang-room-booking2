@@ -39,6 +39,8 @@ function publicBooking_(row, viewer) {
     createdAt: String(row.createdAt || ''),
     approvalStep: Domain.currentApprovalStep({ status: String(row.status), approvalStep: row.approvalStep }),
     approvalLog: Domain.parseApprovalLog(row.approvalLog),
+    // ชื่อ/ชนิด/ขนาดไฟล์เท่านั้น — ตัวไฟล์ต้องขอผ่าน bookingAttachment ซึ่งตรวจสิทธิ์อีกชั้น
+    attachment: Domain.attachmentMetaFromRow(row),
   };
 }
 
@@ -69,14 +71,14 @@ function roomAvailability_(user, raw) {
 function createBooking_(user, raw) {
   const parsed = Domain.validateBookingRequest(raw);
   if (!parsed.ok) throw appError_(ERROR_CODES.VALIDATION, 'ข้อมูลการจองไม่ถูกต้อง', parsed.issues);
-  return createBookingAs_(user, parsed.value);
+  return createBookingAs_(user, parsed.value, parseAttachment_(raw));
 }
 
 /**
  * บันทึกการจองในนามของ actor — ผู้ใช้ที่ล็อกอิน หรือผู้จองทั่วไป (role 'guest', ดู 65_Public.gs)
  * ตัดสินห้องว่าง/กฎการจองภายในล็อกเสมอ ไม่ว่าใครจอง
  */
-function createBookingAs_(user, input) {
+function createBookingAs_(user, input, attachment) {
   if (!input.termsAccepted) throw appError_(ERROR_CODES.VALIDATION, 'กรุณายอมรับเงื่อนไขการใช้ห้องประชุม');
   const lookups = readLookups_();
   if (Domain.unknownLookupKeys(lookups, 'facility', input.requestedFacilities).length > 0) {
@@ -85,7 +87,7 @@ function createBookingAs_(user, input) {
   if (input.meetingType !== '' && Domain.unknownLookupKeys(lookups, 'meetingType', [input.meetingType]).length > 0) {
     throw appError_(ERROR_CODES.VALIDATION, 'ประเภทการประชุมนี้ถูกปิดใช้ไปแล้ว กรุณาเลือกใหม่');
   }
-  return withScriptLock_(function () {
+  const saved = withScriptLock_(function () {
     const roomRow = findByKey_(Domain.SHEET_ROOMS, input.roomId);
     if (!roomRow) throw appError_(ERROR_CODES.NOT_FOUND, 'ไม่พบห้องประชุม');
     const room = publicRoom_(roomRow);
@@ -113,8 +115,11 @@ function createBookingAs_(user, input) {
     if (conflicts.length) throw appError_(ERROR_CODES.CONFLICT, 'ช่วงเวลานี้มีผู้จองแล้ว กรุณาเลือกเวลาใหม่');
     const now = nowIso_();
     const needsApproval = readSettings_().approvalRequired;
+    const bookingId = newId_('bk');
+    // บันทึกไฟล์หลังผ่านทุกเงื่อนไขแล้วเท่านั้น จองไม่สำเร็จจะได้ไม่มีไฟล์ค้างใน Drive
+    const file = attachment ? saveAttachmentFile_(bookingId, attachment) : null;
     const booking = {
-      bookingId: newId_('bk'), roomId: room.roomId, dateKey: input.dateKey,
+      bookingId: bookingId, roomId: room.roomId, dateKey: input.dateKey,
       startMin: input.startMin, endMin: input.endMin,
       status: needsApproval ? 'pending' : 'confirmed', title: input.title,
       approvalStep: needsApproval ? 1 : 0, approvalLog: '[]', customLocation: openLocation ? input.customLocation : '',
@@ -131,12 +136,24 @@ function createBookingAs_(user, input) {
       endAt: Domain.fromDateKeyAndMinutes(input.dateKey, input.endMin).toISOString(),
       createdBy: user.email, createdAt: now, updatedBy: user.email, updatedAt: now,
       trackingCode: newTrackingCode_(),
+      attachmentFileId: file ? file.fileId : '', attachmentName: attachment ? attachment.name : '',
+      attachmentMime: attachment ? attachment.mimeType : '', attachmentSize: attachment ? attachment.size : '',
     };
-    appendObject_(Domain.SHEET_BOOKINGS, booking);
-    audit_(user.email, 'booking.create', 'booking', booking.bookingId, { roomId: room.roomId, dateKey: input.dateKey });
+    try {
+      appendObject_(Domain.SHEET_BOOKINGS, booking);
+    } catch (error) {
+      if (file) trashAttachmentFile_(file.fileId);
+      throw error;
+    }
+    audit_(user.email, 'booking.create', 'booking', booking.bookingId, {
+      roomId: room.roomId, dateKey: input.dateKey, attachment: attachment ? attachment.name : '',
+    });
     bumpDataVersion_();
-    return { booking: publicBooking_(booking, 'owner'), trackingCode: booking.trackingCode };
+    return booking;
   });
+  // แจ้ง LINE นอกล็อก (ใช้เวลาเรียกเครือข่าย) — ส่งไม่สำเร็จไม่กระทบการจองที่บันทึกแล้ว
+  notifyBookingCreated_(saved);
+  return { booking: publicBooking_(saved, 'owner'), trackingCode: saved.trackingCode };
 }
 
 function cancelBooking_(user, payload) {

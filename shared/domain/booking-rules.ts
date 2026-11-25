@@ -8,11 +8,13 @@
  */
 
 import {
+  addDaysToDateKey,
   dateKeyRange,
   dayOfWeekOfDateKey,
   formatTimeOfDay,
   fromDateKeyAndMinutes,
   parseTimeOfDay,
+  toDateKey,
 } from '../time/bangkok';
 import type { RoomEquipment, RoomStatus } from '../schemas/room';
 import { ROOM_EQUIPMENT_LABEL_TH, isBookableRoomStatus } from '../schemas/room';
@@ -145,12 +147,14 @@ export function validateBookingRules(
   // ใช้ instant จริงเทียบ เพื่อไม่ให้ผู้ใช้ที่ตั้งนาฬิกาเครื่องผิดจองย้อนหลังได้
   const startInstant = fromDateKeyAndMinutes(input.dateKey, input.startMin);
   const minutesUntilStart = (startInstant.getTime() - now.getTime()) / 60_000;
-  const mayBackdate = isAdmin && settings.allowAdminBackdate;
+  const backdateDays = Math.max(0, Math.floor(Number(settings.backdateDays) || 0));
+  const mayBackdate =
+    (isAdmin && settings.allowAdminBackdate) || input.dateKey >= earliestBackdateKey(now, backdateDays);
 
   if (minutesUntilStart < 0 && !mayBackdate) {
     issues.push({
       code: 'IN_THE_PAST',
-      message: 'ไม่สามารถจองย้อนหลังได้',
+      message: backdateDays > 0 ? `จองย้อนหลังได้ไม่เกิน ${backdateDays} วัน` : 'ไม่สามารถจองย้อนหลังได้',
       field: 'dateKey',
     });
   } else if (
@@ -190,6 +194,14 @@ export function validateBookingRules(
   }
 
   return issues.length === 0 ? { ok: true } : { ok: false, issues };
+}
+
+/**
+ * วันแรกที่ยังบันทึกย้อนหลังได้ (นับตามปฏิทินไทย) — 0 วัน = วันนี้ ซึ่งเวลาที่ผ่านไปแล้วของวันนี้ก็ยังย้อนไม่ได้
+ * ใช้ทั้งฝั่งหน้าเว็บ (กำหนดวันแรกในปฏิทิน) และฝั่งเซิร์ฟเวอร์ (ตัดสินจริง)
+ */
+export function earliestBackdateKey(now: Date, backdateDays: number): string {
+  return backdateDays > 0 ? addDaysToDateKey(toDateKey(now), -backdateDays) : '9999-12-31';
 }
 
 /** ยกเลิกได้หรือไม่ตามนโยบายเวลา (ผู้ดูแลข้ามได้ แต่ต้องลง audit log) */

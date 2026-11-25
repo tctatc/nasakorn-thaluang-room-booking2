@@ -40,6 +40,11 @@ function setupSystem() {
 
   // 3) ชีตทั้งหมด
   log.push(...migrateSheets());
+  // สร้างโฟลเดอร์เอกสารแนบไว้ก่อน (และให้ Google ขอสิทธิ์ Drive ตั้งแต่ตอนติดตั้ง ไม่ใช่ตอนผู้ใช้จองครั้งแรก)
+  log.push(`โฟลเดอร์เอกสารแนบ (ส่วนตัว ห้ามแชร์): ${attachmentFolder_().getUrl()}`);
+  log.push(getProp_(PROP_LINE_TOKEN) === ''
+    ? 'ยังไม่ได้ตั้ง LINE_CHANNEL_ACCESS_TOKEN — ระบบทำงานได้ แต่จะยังไม่แจ้งเตือนทาง LINE (ดูขั้นตอนใน docs/03-แจ้งเตือน-LINE.md)'
+    : 'มีโทเคน LINE แล้ว — เลือกกลุ่มรับแจ้งเตือนได้ที่หน้า ตั้งค่าข้อมูล > แจ้งเตือน LINE');
 
   // 3.1) ห้องประชุมของวิทยาลัย (เฉพาะตอนชีต Rooms ยังว่าง)
   log.push(seedRooms());
@@ -54,7 +59,17 @@ function setupSystem() {
     settingsSheet.getRange(2, 1, rows.length, 3).setValues(rows);
     log.push(`เขียนค่าตั้งค่าเริ่มต้น ${rows.length} รายการ`);
   } else {
-    log.push('มีค่าตั้งค่าอยู่แล้ว ไม่เขียนทับ');
+    // ระบบรุ่นใหม่เพิ่มค่าตั้งค่า (เช่น backdateDays) — เติมเฉพาะแถวที่ยังไม่มี ไม่แตะค่าที่ผู้ดูแลแก้ไว้
+    const existing = settingsSheet.getRange(2, 1, settingsSheet.getLastRow() - 1, 1).getValues()
+      .map(function (row) { return String(row[0]).trim(); });
+    const missing = Domain.settingsToRows(Domain.DEFAULT_SYSTEM_SETTINGS)
+      .filter(function (row) { return existing.indexOf(String(row[0])) < 0; });
+    if (missing.length) {
+      settingsSheet.getRange(settingsSheet.getLastRow() + 1, 1, missing.length, 3).setValues(missing);
+      log.push(`เพิ่มค่าตั้งค่าใหม่ ${missing.length} รายการ: ${missing.map(function (row) { return row[0]; }).join(', ')}`);
+    } else {
+      log.push('มีค่าตั้งค่าอยู่แล้ว ไม่เขียนทับ');
+    }
   }
 
   // 5) ตัวนับเวอร์ชันข้อมูล

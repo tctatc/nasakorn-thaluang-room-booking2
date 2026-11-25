@@ -18,14 +18,18 @@ import { useToast } from '../../components/ui/Toast';
 import { cn } from '../../lib/cn';
 import { useLookups } from '../../lib/hooks/useLookups';
 import { shrinkImage } from '../../lib/image/shrinkImage';
+import { LinePanel } from './LinePanel';
+import { ResetPanel } from './ResetPanel';
 
 const inputClass = 'min-h-11 w-full rounded-control border border-line bg-surface px-3 text-base text-ink outline-none transition-colors duration-150 focus:border-brand focus:ring-2 focus:ring-brand/20';
 const labelClass = 'mb-1.5 block text-sm font-medium text-ink';
 
-type Tab = 'rooms' | LookupKind;
+type Tab = 'rooms' | LookupKind | 'line' | 'data';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'rooms', label: 'ห้องประชุม' },
   ...LOOKUP_KINDS.map((kind) => ({ id: kind, label: LOOKUP_KIND_LABEL_TH[kind] })),
+  { id: 'line', label: 'แจ้งเตือน LINE' },
+  { id: 'data', label: 'ล้างข้อมูล' },
 ];
 
 /** คำอธิบายใต้หัวแต่ละแท็บ — บอกว่ารายการนี้ไปโผล่ที่ไหน */
@@ -36,6 +40,8 @@ const TAB_HINT: Record<Tab, string> = {
   meetingType: 'ตัวเลือกประเภทการประชุมในแบบฟอร์มจอง ใช้แยกสถิติในรายงาน',
   department: 'รายชื่อให้เลือกในแบบฟอร์มจองและบัญชีผู้ใช้ ใส่ชื่อหัวหน้าแผนกไว้ได้',
   position: 'รายชื่อตำแหน่งให้เลือกในแบบฟอร์มจองและบัญชีผู้ใช้',
+  data: 'เริ่มบันทึกใหม่ตั้งแต่ศูนย์ — คำขอรายตัวแก้หรือลบได้จากหน้าอนุมัติและปฏิทิน (ปุ่ม "แก้ไข / ลบ")',
+  line: 'ส่งการ์ดแจ้งเข้ากลุ่ม LINE ทุกครั้งที่มีการจองสำเร็จ: วันที่ เวลา ผู้จอง ห้อง และปุ่มเปิดเอกสารแนบ (เปิดได้เฉพาะผู้มีสิทธิ์)',
 };
 
 /** หน้าตั้งค่าข้อมูล (ผู้ดูแล) — ห้องประชุมและรายการตั้งต้นที่แบบฟอร์มใช้ แก้ได้เองไม่ต้องแก้โค้ด */
@@ -87,7 +93,7 @@ export function ManagePage() {
       </div>
       <section id="manage-panel" role="tabpanel" aria-labelledby={`manage-tab-${tab}`}>
         <p className="mb-4 max-w-2xl text-sm text-ink-muted">{TAB_HINT[tab]}</p>
-        {tab === 'rooms' ? <RoomsPanel /> : <LookupPanel key={tab} kind={tab} />}
+        {tab === 'rooms' ? <RoomsPanel /> : tab === 'line' ? <LinePanel /> : tab === 'data' ? <ResetPanel /> : <LookupPanel key={tab} kind={tab} />}
       </section>
     </>
   );

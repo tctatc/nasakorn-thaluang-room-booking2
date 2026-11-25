@@ -22,9 +22,16 @@ var Domain = (() => {
   // shared/index.ts
   var index_exports = {};
   __export(index_exports, {
+    ADMIN_EDITABLE_FIELDS: () => ADMIN_EDITABLE_FIELDS,
     ANNOUNCEMENT_TONES: () => ANNOUNCEMENT_TONES,
     ANNOUNCEMENT_TONE_LABEL_TH: () => ANNOUNCEMENT_TONE_LABEL_TH,
     APPROVAL_STEPS: () => APPROVAL_STEPS,
+    ATTACHMENT_ACCEPT: () => ATTACHMENT_ACCEPT,
+    ATTACHMENT_KINDS: () => ATTACHMENT_KINDS,
+    ATTACHMENT_LOCAL_MAX_BYTES: () => ATTACHMENT_LOCAL_MAX_BYTES,
+    ATTACHMENT_MAX_BYTES: () => ATTACHMENT_MAX_BYTES,
+    ATTACHMENT_MIME: () => ATTACHMENT_MIME,
+    ATTACHMENT_TYPES_TEXT: () => ATTACHMENT_TYPES_TEXT,
     BANGKOK_TZ: () => BANGKOK_TZ,
     BOOKING_DECISIONS: () => BOOKING_DECISIONS,
     BOOKING_HOT_COLUMNS: () => BOOKING_HOT_COLUMNS,
@@ -36,6 +43,7 @@ var Domain = (() => {
     DATE_KEY_PATTERN: () => DATE_KEY_PATTERN,
     DEFAULT_SYSTEM_SETTINGS: () => DEFAULT_SYSTEM_SETTINGS,
     GUEST_BOOKINGS_PER_HOUR: () => GUEST_BOOKINGS_PER_HOUR,
+    LINE_TARGET_PATTERN: () => LINE_TARGET_PATTERN,
     LOCK_HOLDING_STATUSES: () => LOCK_HOLDING_STATUSES,
     LOOKUP_KEY_PATTERN: () => LOOKUP_KEY_PATTERN,
     LOOKUP_KINDS: () => LOOKUP_KINDS,
@@ -54,6 +62,7 @@ var Domain = (() => {
     REPORT_COUNTED_STATUSES: () => REPORT_COUNTED_STATUSES,
     REQUEST_FACILITIES: () => REQUEST_FACILITIES,
     REQUEST_FACILITY_LABEL_TH: () => REQUEST_FACILITY_LABEL_TH,
+    RESET_CONFIRM_PHRASE: () => RESET_CONFIRM_PHRASE,
     REVIEW_ASPECTS: () => REVIEW_ASPECTS,
     REVIEW_ASPECT_LABEL_TH: () => REVIEW_ASPECT_LABEL_TH,
     REVIEW_COMMENT_MAX: () => REVIEW_COMMENT_MAX,
@@ -87,11 +96,17 @@ var Domain = (() => {
     activeAnnouncements: () => activeAnnouncements,
     activeLookups: () => activeLookups,
     addDaysToDateKey: () => addDaysToDateKey,
+    adminEditRuleIssues: () => adminEditRuleIssues,
     approvedSlotsOn: () => approvedSlotsOn,
     asRecord: () => asRecord,
     assertTransition: () => assertTransition,
+    attachmentMetaFromRow: () => attachmentMetaFromRow,
+    attachmentPagePath: () => attachmentPagePath,
+    base64ByteLength: () => base64ByteLength,
+    base64Head: () => base64Head,
     bookableDayCount: () => bookableDayCount,
     bookedMinutesWithin: () => bookedMinutesWithin,
+    bookingLineMessage: () => bookingLineMessage,
     buildHeaderMap: () => buildHeaderMap,
     buildReport: () => buildReport,
     businessWindow: () => businessWindow,
@@ -100,6 +115,7 @@ var Domain = (() => {
     canSeeAllBookings: () => canSeeAllBookings,
     canTransition: () => canTransition,
     canUseRoom: () => canUseRoom,
+    cleanAttachmentName: () => cleanAttachmentName,
     computeUtilization: () => computeUtilization,
     conflictingSlots: () => conflictingSlots,
     constantTimeEqual: () => constantTimeEqual,
@@ -113,8 +129,13 @@ var Domain = (() => {
     daysInRange: () => daysInRange,
     decideApprovalStep: () => decideApprovalStep,
     defaultLookups: () => defaultLookups,
+    durationThai: () => durationThai,
+    earliestBackdateKey: () => earliestBackdateKey,
+    editConflicts: () => editConflicts,
+    extensionOf: () => extensionOf,
     findConflicts: () => findConflicts,
     findRowNumber: () => findRowNumber,
+    formatFileSize: () => formatFileSize,
     formatTimeOfDay: () => formatTimeOfDay,
     formatTrackingCode: () => formatTrackingCode,
     formatUtilization: () => formatUtilization,
@@ -130,23 +151,28 @@ var Domain = (() => {
     isFinalStatus: () => isFinalStatus,
     isGuestAccountId: () => isGuestAccountId,
     isOpenLocationRoom: () => isOpenLocationRoom,
+    isSafeSiteUrl: () => isSafeSiteUrl,
     isStartBlocked: () => isStartBlocked,
     keyValueToObject: () => keyValueToObject,
     lastAdminProblem: () => lastAdminProblem,
+    lineTargetKind: () => lineTargetKind,
     liveRoomState: () => liveRoomState,
     lookupLabel: () => lookupLabel,
     matchesReportFilter: () => matchesReportFilter,
+    mergeAdminEdit: () => mergeAdminEdit,
     mergeIntervals: () => mergeIntervals,
     missingColumns: () => missingColumns,
     monthsBetween: () => monthsBetween,
     newLookupKey: () => newLookupKey,
     normalizeDateKey: () => normalizeDateKey,
+    normalizeSiteUrl: () => normalizeSiteUrl,
     normalizeTrackingCode: () => normalizeTrackingCode,
     normalizeUserRole: () => normalizeUserRole,
     normalizeUsername: () => normalizeUsername,
     objectToRow: () => objectToRow,
     overlaps: () => overlaps,
     parseApprovalLog: () => parseApprovalLog,
+    parseLineTargets: () => parseLineTargets,
     parseTimeOfDay: () => parseTimeOfDay,
     passwordDigestMessage: () => passwordDigestMessage,
     passwordProblem: () => passwordProblem,
@@ -170,16 +196,22 @@ var Domain = (() => {
     sessionExpiryFrom: () => sessionExpiryFrom,
     settingsToRows: () => settingsToRows,
     sheetSpec: () => sheetSpec,
+    siteLink: () => siteLink,
+    sniffAttachmentKind: () => sniffAttachmentKind,
     sortLookups: () => sortLookups,
     stepForRole: () => stepForRole,
     suggestAlternatives: () => suggestAlternatives,
     summarizeRoomRatings: () => summarizeRoomRatings,
+    thaiLongDate: () => thaiLongDate,
+    thaiShortDate: () => thaiShortDate,
+    timeRangeThai: () => timeRangeThai,
     toDateKey: () => toDateKey,
     toMinutesOfDay: () => toMinutesOfDay,
     trackingCodeFromBytes: () => trackingCodeFromBytes,
     tzOffsetMinutes: () => tzOffsetMinutes,
     unknownLookupKeys: () => unknownLookupKeys,
     validateAnnouncementInput: () => validateAnnouncementInput,
+    validateAttachmentUpload: () => validateAttachmentUpload,
     validateAvailabilityInput: () => validateAvailabilityInput,
     validateBookingRequest: () => validateBookingRequest,
     validateBookingRules: () => validateBookingRules,
@@ -348,17 +380,17 @@ var Domain = (() => {
     const map = buildHeaderMap(header);
     return required.filter((name) => map[name] === void 0);
   }
-  function rowToObject(row, headerMap) {
+  function rowToObject(row2, headerMap) {
     var _a;
     const object = {};
     for (const name of Object.keys(headerMap)) {
       const index = headerMap[name];
-      object[name] = index === void 0 ? null : (_a = row[index]) != null ? _a : null;
+      object[name] = index === void 0 ? null : (_a = row2[index]) != null ? _a : null;
     }
     return object;
   }
   function rowsToObjects(rows, headerMap) {
-    return rows.map((row) => rowToObject(row, headerMap));
+    return rows.map((row2) => rowToObject(row2, headerMap));
   }
   function objectToRow(object, header) {
     return header.map((name) => {
@@ -415,19 +447,19 @@ var Domain = (() => {
   function keyValueToObject(rows, keyIndex = 0, valueIndex = 1) {
     var _a;
     const result = {};
-    for (const row of rows) {
-      const key = row[keyIndex];
+    for (const row2 of rows) {
+      const key = row2[keyIndex];
       if (typeof key === "string" && key.trim() !== "") {
-        result[key.trim()] = (_a = row[valueIndex]) != null ? _a : null;
+        result[key.trim()] = (_a = row2[valueIndex]) != null ? _a : null;
       }
     }
     return result;
   }
   function findRowNumber(rows, columnIndex, value, offset = 2) {
     for (let i = 0; i < rows.length; i += 1) {
-      const row = rows[i];
-      if (row === void 0) continue;
-      const cell = row[columnIndex];
+      const row2 = rows[i];
+      if (row2 === void 0) continue;
+      const cell = row2[columnIndex];
       if (cell !== null && cell !== void 0 && String(cell) === value) return i + offset;
     }
     return -1;
@@ -446,6 +478,7 @@ var Domain = (() => {
     cancelCutoffMinutes: 0,
     approvalRequired: true,
     allowAdminBackdate: true,
+    backdateDays: 7,
     maxActiveBookingsPerUser: 20,
     reminderLeadMinutes: 15
   };
@@ -508,6 +541,11 @@ var Domain = (() => {
       }),
       allowAdminBackdate: check.boolean("allowAdminBackdate", input.allowAdminBackdate, {
         label: "\u0E2A\u0E34\u0E17\u0E18\u0E34\u0E4C\u0E08\u0E2D\u0E07\u0E22\u0E49\u0E2D\u0E19\u0E2B\u0E25\u0E31\u0E07\u0E02\u0E2D\u0E07\u0E1C\u0E39\u0E49\u0E14\u0E39\u0E41\u0E25"
+      }),
+      backdateDays: check.integer("backdateDays", input.backdateDays, {
+        label: "\u0E08\u0E33\u0E19\u0E27\u0E19\u0E27\u0E31\u0E19\u0E17\u0E35\u0E48\u0E08\u0E2D\u0E07\u0E22\u0E49\u0E2D\u0E19\u0E2B\u0E25\u0E31\u0E07\u0E44\u0E14\u0E49",
+        min: 0,
+        max: 60
       }),
       maxActiveBookingsPerUser: check.integer(
         "maxActiveBookingsPerUser",
@@ -635,7 +673,12 @@ var Domain = (() => {
         "customLocation",
         "meetingType",
         // รหัสติดตามสถานะ (สุ่ม เดาไม่ได้) — ผู้จองทั่วไปใช้ดูสถานะ พิมพ์แบบฟอร์ม และยกเลิกคำขอของตัวเอง
-        "trackingCode"
+        "trackingCode",
+        // เอกสารแนบ 1 ไฟล์: รหัสไฟล์ใน Google Drive (ไฟล์ส่วนตัว ไม่แชร์) — ห้ามส่งรหัสนี้ให้หน้าเว็บ
+        "attachmentFileId",
+        "attachmentName",
+        "attachmentMime",
+        "attachmentSize"
       ]
     },
     {
@@ -715,7 +758,8 @@ var Domain = (() => {
     minLeadMinutes: "\u0E15\u0E49\u0E2D\u0E07\u0E08\u0E2D\u0E07\u0E25\u0E48\u0E27\u0E07\u0E2B\u0E19\u0E49\u0E32\u0E2D\u0E22\u0E48\u0E32\u0E07\u0E19\u0E49\u0E2D\u0E22\u0E01\u0E35\u0E48\u0E19\u0E32\u0E17\u0E35 (0 = \u0E08\u0E2D\u0E07\u0E43\u0E0A\u0E49\u0E17\u0E31\u0E19\u0E17\u0E35\u0E44\u0E14\u0E49)",
     cancelCutoffMinutes: "\u0E22\u0E01\u0E40\u0E25\u0E34\u0E01\u0E44\u0E14\u0E49\u0E01\u0E48\u0E2D\u0E19\u0E40\u0E27\u0E25\u0E32\u0E40\u0E23\u0E34\u0E48\u0E21\u0E2D\u0E22\u0E48\u0E32\u0E07\u0E19\u0E49\u0E2D\u0E22\u0E01\u0E35\u0E48\u0E19\u0E32\u0E17\u0E35",
     approvalRequired: "TRUE = \u0E01\u0E32\u0E23\u0E08\u0E2D\u0E07\u0E15\u0E49\u0E2D\u0E07\u0E23\u0E2D\u0E2D\u0E19\u0E38\u0E21\u0E31\u0E15\u0E34\u0E01\u0E48\u0E2D\u0E19, FALSE = \u0E22\u0E37\u0E19\u0E22\u0E31\u0E19\u0E17\u0E31\u0E19\u0E17\u0E35",
-    allowAdminBackdate: "TRUE = \u0E1C\u0E39\u0E49\u0E14\u0E39\u0E41\u0E25\u0E08\u0E2D\u0E07\u0E22\u0E49\u0E2D\u0E19\u0E2B\u0E25\u0E31\u0E07\u0E44\u0E14\u0E49",
+    allowAdminBackdate: "TRUE = \u0E1C\u0E39\u0E49\u0E14\u0E39\u0E41\u0E25\u0E08\u0E2D\u0E07\u0E22\u0E49\u0E2D\u0E19\u0E2B\u0E25\u0E31\u0E07\u0E44\u0E14\u0E49 (\u0E44\u0E21\u0E48\u0E08\u0E33\u0E01\u0E31\u0E14\u0E27\u0E31\u0E19)",
+    backdateDays: "\u0E17\u0E38\u0E01\u0E04\u0E19\u0E1A\u0E31\u0E19\u0E17\u0E36\u0E01\u0E01\u0E32\u0E23\u0E43\u0E0A\u0E49\u0E2B\u0E49\u0E2D\u0E07\u0E22\u0E49\u0E2D\u0E19\u0E2B\u0E25\u0E31\u0E07\u0E44\u0E14\u0E49\u0E01\u0E35\u0E48\u0E27\u0E31\u0E19 0 = \u0E44\u0E21\u0E48\u0E44\u0E14\u0E49 (\u0E22\u0E31\u0E07\u0E15\u0E49\u0E2D\u0E07\u0E1C\u0E48\u0E32\u0E19\u0E01\u0E32\u0E23\u0E2D\u0E19\u0E38\u0E21\u0E31\u0E15\u0E34)",
     maxActiveBookingsPerUser: "\u0E08\u0E33\u0E19\u0E27\u0E19\u0E01\u0E32\u0E23\u0E08\u0E2D\u0E07\u0E17\u0E35\u0E48\u0E22\u0E31\u0E07\u0E44\u0E21\u0E48\u0E2A\u0E34\u0E49\u0E19\u0E2A\u0E38\u0E14\u0E2A\u0E39\u0E07\u0E2A\u0E38\u0E14\u0E15\u0E48\u0E2D\u0E04\u0E19",
     reminderLeadMinutes: "\u0E41\u0E08\u0E49\u0E07\u0E40\u0E15\u0E37\u0E2D\u0E19\u0E01\u0E48\u0E2D\u0E19\u0E40\u0E23\u0E34\u0E48\u0E21\u0E1B\u0E23\u0E30\u0E0A\u0E38\u0E21\u0E01\u0E35\u0E48\u0E19\u0E32\u0E17\u0E35"
   };
@@ -761,6 +805,7 @@ var Domain = (() => {
         "allowAdminBackdate",
         DEFAULT_SYSTEM_SETTINGS.allowAdminBackdate
       ),
+      backdateDays: readNumber(record, "backdateDays", DEFAULT_SYSTEM_SETTINGS.backdateDays),
       maxActiveBookingsPerUser: readNumber(
         record,
         "maxActiveBookingsPerUser",
@@ -1091,12 +1136,12 @@ var Domain = (() => {
     }
     return new Date(instant);
   }
-  function parseTimeOfDay(hhmm) {
-    const match = /^(\d{2}):(\d{2})$/.exec(hhmm);
-    if (!match) throw new Error(`\u0E40\u0E27\u0E25\u0E32\u0E15\u0E49\u0E2D\u0E07\u0E2D\u0E22\u0E39\u0E48\u0E43\u0E19\u0E23\u0E39\u0E1B\u0E41\u0E1A\u0E1A HH:mm \u0E41\u0E15\u0E48\u0E44\u0E14\u0E49\u0E23\u0E31\u0E1A "${hhmm}"`);
+  function parseTimeOfDay(hhmm2) {
+    const match = /^(\d{2}):(\d{2})$/.exec(hhmm2);
+    if (!match) throw new Error(`\u0E40\u0E27\u0E25\u0E32\u0E15\u0E49\u0E2D\u0E07\u0E2D\u0E22\u0E39\u0E48\u0E43\u0E19\u0E23\u0E39\u0E1B\u0E41\u0E1A\u0E1A HH:mm \u0E41\u0E15\u0E48\u0E44\u0E14\u0E49\u0E23\u0E31\u0E1A "${hhmm2}"`);
     const hour = Number(match[1]);
     const minute = Number(match[2]);
-    if (hour > 23 || minute > 59) throw new Error(`\u0E40\u0E27\u0E25\u0E32\u0E44\u0E21\u0E48\u0E16\u0E39\u0E01\u0E15\u0E49\u0E2D\u0E07: "${hhmm}"`);
+    if (hour > 23 || minute > 59) throw new Error(`\u0E40\u0E27\u0E25\u0E32\u0E44\u0E21\u0E48\u0E16\u0E39\u0E01\u0E15\u0E49\u0E2D\u0E07: "${hhmm2}"`);
     return hour * 60 + minute;
   }
   function formatTimeOfDay(minutesOfDay) {
@@ -1241,11 +1286,11 @@ var Domain = (() => {
   // shared/domain/availability.ts
   function busySlotsFor(rows, roomId, dateKey, excludeBookingId) {
     return rows.filter(
-      (row) => String(row.roomId) === roomId && normalizeDateKey(row.dateKey) === dateKey && LOCK_HOLDING_STATUSES.includes(String(row.status)) && (excludeBookingId === void 0 || String(row.bookingId) !== excludeBookingId)
-    ).map((row) => ({
-      startMin: Number(row.startMin),
-      endMin: Number(row.endMin),
-      status: String(row.status)
+      (row2) => String(row2.roomId) === roomId && normalizeDateKey(row2.dateKey) === dateKey && LOCK_HOLDING_STATUSES.includes(String(row2.status)) && (excludeBookingId === void 0 || String(row2.bookingId) !== excludeBookingId)
+    ).map((row2) => ({
+      startMin: Number(row2.startMin),
+      endMin: Number(row2.endMin),
+      status: String(row2.status)
     })).filter((slot) => Number.isFinite(slot.startMin) && Number.isFinite(slot.endMin)).sort((a, b) => a.startMin - b.startMin);
   }
   function conflictingSlots(requested, busy) {
@@ -1269,11 +1314,11 @@ var Domain = (() => {
     return windows.filter((window) => window.endMin > window.startMin);
   }
   function publicSlotsBetween(rows, from, to) {
-    return rows.map((row) => ({ row, dateKey: normalizeDateKey(row.dateKey), status: String(row.status) })).filter(({ dateKey, status }) => dateKey >= from && dateKey <= to && ["pending", "confirmed", "completed"].includes(status)).map(({ row, dateKey, status }) => ({
-      roomId: String(row.roomId),
+    return rows.map((row2) => ({ row: row2, dateKey: normalizeDateKey(row2.dateKey), status: String(row2.status) })).filter(({ dateKey, status }) => dateKey >= from && dateKey <= to && ["pending", "confirmed", "completed"].includes(status)).map(({ row: row2, dateKey, status }) => ({
+      roomId: String(row2.roomId),
       dateKey,
-      startMin: Number(row.startMin),
-      endMin: Number(row.endMin),
+      startMin: Number(row2.startMin),
+      endMin: Number(row2.endMin),
       status: status === "pending" ? "pending" : "confirmed"
     })).filter((slot) => Number.isFinite(slot.startMin) && Number.isFinite(slot.endMin) && slot.endMin > slot.startMin).sort((a, b) => a.dateKey.localeCompare(b.dateKey) || a.startMin - b.startMin);
   }
@@ -1431,11 +1476,12 @@ var Domain = (() => {
     }
     const startInstant = fromDateKeyAndMinutes(input.dateKey, input.startMin);
     const minutesUntilStart = (startInstant.getTime() - now.getTime()) / 6e4;
-    const mayBackdate = isAdmin && settings.allowAdminBackdate;
+    const backdateDays = Math.max(0, Math.floor(Number(settings.backdateDays) || 0));
+    const mayBackdate = isAdmin && settings.allowAdminBackdate || input.dateKey >= earliestBackdateKey(now, backdateDays);
     if (minutesUntilStart < 0 && !mayBackdate) {
       issues.push({
         code: "IN_THE_PAST",
-        message: "\u0E44\u0E21\u0E48\u0E2A\u0E32\u0E21\u0E32\u0E23\u0E16\u0E08\u0E2D\u0E07\u0E22\u0E49\u0E2D\u0E19\u0E2B\u0E25\u0E31\u0E07\u0E44\u0E14\u0E49",
+        message: backdateDays > 0 ? `\u0E08\u0E2D\u0E07\u0E22\u0E49\u0E2D\u0E19\u0E2B\u0E25\u0E31\u0E07\u0E44\u0E14\u0E49\u0E44\u0E21\u0E48\u0E40\u0E01\u0E34\u0E19 ${backdateDays} \u0E27\u0E31\u0E19` : "\u0E44\u0E21\u0E48\u0E2A\u0E32\u0E21\u0E32\u0E23\u0E16\u0E08\u0E2D\u0E07\u0E22\u0E49\u0E2D\u0E19\u0E2B\u0E25\u0E31\u0E07\u0E44\u0E14\u0E49",
         field: "dateKey"
       });
     } else if (minutesUntilStart >= 0 && minutesUntilStart < settings.minLeadMinutes && !isAdmin) {
@@ -1470,6 +1516,9 @@ var Domain = (() => {
       });
     }
     return issues.length === 0 ? { ok: true } : { ok: false, issues };
+  }
+  function earliestBackdateKey(now, backdateDays) {
+    return backdateDays > 0 ? addDaysToDateKey(toDateKey(now), -backdateDays) : "9999-12-31";
   }
   function canCancelBooking(params) {
     if (params.isAdmin) return { ok: true };
@@ -1942,12 +1991,12 @@ var Domain = (() => {
   function group(rows, keyOf, seed = []) {
     var _a;
     const groups = new Map(seed.map((key) => [key, { key, count: 0, minutes: 0, attendees: 0 }]));
-    for (const row of rows) {
-      const key = keyOf(row);
+    for (const row2 of rows) {
+      const key = keyOf(row2);
       const item = (_a = groups.get(key)) != null ? _a : { key, count: 0, minutes: 0, attendees: 0 };
       item.count += 1;
-      item.minutes += Math.max(0, row.endMin - row.startMin);
-      item.attendees += Math.max(0, Number(row.attendees) || 0);
+      item.minutes += Math.max(0, row2.endMin - row2.startMin);
+      item.attendees += Math.max(0, Number(row2.attendees) || 0);
       groups.set(key, item);
     }
     return [...groups.values()];
@@ -1967,13 +2016,13 @@ var Domain = (() => {
       minutes: totals.minutes,
       attendees: totals.attendees,
       byStatus,
-      byRoom: group(rows, (row) => row.roomId).sort(byUsage),
-      byDepartment: group(rows, (row) => row.department.trim()).sort(byUsage),
-      byMeetingType: group(rows, (row) => {
+      byRoom: group(rows, (row2) => row2.roomId).sort(byUsage),
+      byDepartment: group(rows, (row2) => row2.department.trim()).sort(byUsage),
+      byMeetingType: group(rows, (row2) => {
         var _a2;
-        return (_a2 = row.meetingType) != null ? _a2 : "";
+        return (_a2 = row2.meetingType) != null ? _a2 : "";
       }).sort(byUsage),
-      byMonth: group(rows, (row) => row.dateKey.slice(0, 7), monthsBetween(filter.from, filter.to)).sort((a, b) => a.key.localeCompare(b.key)),
+      byMonth: group(rows, (row2) => row2.dateKey.slice(0, 7), monthsBetween(filter.from, filter.to)).sort((a, b) => a.key.localeCompare(b.key)),
       rows
     };
   }
@@ -1985,7 +2034,7 @@ var Domain = (() => {
 
   // shared/domain/room-status.ts
   function approvedSlotsOn(rows, dateKey) {
-    return rows.filter((row) => normalizeDateKey(row.dateKey) === dateKey && REPORT_COUNTED_STATUSES.includes(String(row.status))).map((row) => ({ roomId: String(row.roomId), startMin: Number(row.startMin), endMin: Number(row.endMin) })).filter((slot) => Number.isFinite(slot.startMin) && Number.isFinite(slot.endMin) && slot.endMin > slot.startMin).sort((a, b) => a.startMin - b.startMin);
+    return rows.filter((row2) => normalizeDateKey(row2.dateKey) === dateKey && REPORT_COUNTED_STATUSES.includes(String(row2.status))).map((row2) => ({ roomId: String(row2.roomId), startMin: Number(row2.startMin), endMin: Number(row2.endMin) })).filter((slot) => Number.isFinite(slot.startMin) && Number.isFinite(slot.endMin) && slot.endMin > slot.startMin).sort((a, b) => a.startMin - b.startMin);
   }
   function liveRoomState(room, slots, nowMin) {
     var _a;
@@ -2060,6 +2109,293 @@ var Domain = (() => {
   }
   function scheduleWindow(from, days) {
     return { from, to: addDaysToDateKey(from, Math.max(1, Math.min(days, PUBLIC_SCHEDULE_MAX_DAYS)) - 1) };
+  }
+
+  // shared/schemas/attachment.ts
+  var ATTACHMENT_MAX_BYTES = 5 * 1024 * 1024;
+  var ATTACHMENT_LOCAL_MAX_BYTES = 1024 * 1024;
+  var ATTACHMENT_KINDS = ["pdf", "jpg", "png", "docx", "xlsx"];
+  var ATTACHMENT_MIME = {
+    pdf: "application/pdf",
+    jpg: "image/jpeg",
+    png: "image/png",
+    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  };
+  var EXTENSION_KIND = {
+    pdf: "pdf",
+    jpg: "jpg",
+    jpeg: "jpg",
+    png: "png",
+    docx: "docx",
+    xlsx: "xlsx"
+  };
+  var ATTACHMENT_ACCEPT = ".pdf,.jpg,.jpeg,.png,.docx,.xlsx";
+  var ATTACHMENT_TYPES_TEXT = "PDF, \u0E23\u0E39\u0E1B JPG/PNG, Word (.docx), Excel (.xlsx)";
+  function cleanAttachmentName(raw) {
+    var _a;
+    const base = (_a = String(raw != null ? raw : "").split(/[\\/]/).pop()) != null ? _a : "";
+    const cleaned = base.replace(/[\u0000-\u001f\u007f<>:"|?*]/g, "").replace(/\s+/g, " ").replace(/^[.\s]+/, "").trim();
+    if (cleaned.length <= 120) return cleaned;
+    const dot = cleaned.lastIndexOf(".");
+    const ext = dot > 0 && cleaned.length - dot <= 6 ? cleaned.slice(dot) : "";
+    return cleaned.slice(0, 120 - ext.length) + ext;
+  }
+  function extensionOf(name) {
+    const dot = name.lastIndexOf(".");
+    return dot > 0 ? name.slice(dot + 1).toLowerCase() : "";
+  }
+  var BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  function base64Head(dataBase64, byteCount = 8) {
+    const chars = dataBase64.slice(0, Math.ceil(byteCount / 3) * 4);
+    const bytes = [];
+    for (let i = 0; i + 3 < chars.length; i += 4) {
+      const n = [0, 1, 2, 3].map((k) => BASE64_CHARS.indexOf(chars[i + k]));
+      bytes.push(n[0] << 2 | n[1] >> 4);
+      if (n[2] >= 0) bytes.push((n[1] & 15) << 4 | n[2] >> 2);
+      if (n[3] >= 0) bytes.push((n[2] & 3) << 6 | n[3]);
+    }
+    return bytes.slice(0, byteCount);
+  }
+  function base64ByteLength(dataBase64) {
+    const padding = dataBase64.endsWith("==") ? 2 : dataBase64.endsWith("=") ? 1 : 0;
+    return Math.max(0, dataBase64.length / 4 * 3 - padding);
+  }
+  var startsWith = (bytes, signature) => signature.every((value, index) => bytes[index] === value);
+  function sniffAttachmentKind(head, fileName) {
+    const byExtension = EXTENSION_KIND[extensionOf(fileName)];
+    if (byExtension === void 0) return null;
+    const actual = startsWith(head, [37, 80, 68, 70]) ? ["pdf"] : startsWith(head, [137, 80, 78, 71, 13, 10, 26, 10]) ? ["png"] : startsWith(head, [255, 216, 255]) ? ["jpg"] : startsWith(head, [80, 75, 3, 4]) ? ["docx", "xlsx"] : [];
+    return actual.includes(byExtension) ? byExtension : null;
+  }
+  function validateAttachmentUpload(raw, maxBytes = ATTACHMENT_MAX_BYTES) {
+    if (raw === void 0 || raw === null) return { ok: true, value: null };
+    const input = asRecord(raw);
+    const check = new Check();
+    const name = cleanAttachmentName(input.name);
+    const dataBase64 = typeof input.dataBase64 === "string" ? input.dataBase64 : "";
+    const empty = { name, mimeType: "", size: 0, kind: "pdf", dataBase64: "" };
+    if (name === "" || extensionOf(name) === "") {
+      check.fail("attachment", "\u0E44\u0E21\u0E48\u0E1E\u0E1A\u0E0A\u0E37\u0E48\u0E2D\u0E44\u0E1F\u0E25\u0E4C\u0E41\u0E19\u0E1A \u0E01\u0E23\u0E38\u0E13\u0E32\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E1F\u0E25\u0E4C\u0E43\u0E2B\u0E21\u0E48");
+      return check.result(empty);
+    }
+    if (dataBase64 === "" || dataBase64.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(dataBase64)) {
+      check.fail("attachment", "\u0E2D\u0E48\u0E32\u0E19\u0E44\u0E1F\u0E25\u0E4C\u0E41\u0E19\u0E1A\u0E44\u0E21\u0E48\u0E44\u0E14\u0E49 \u0E01\u0E23\u0E38\u0E13\u0E32\u0E40\u0E25\u0E37\u0E2D\u0E01\u0E44\u0E1F\u0E25\u0E4C\u0E43\u0E2B\u0E21\u0E48");
+      return check.result(empty);
+    }
+    const size = base64ByteLength(dataBase64);
+    if (size > maxBytes) {
+      check.fail("attachment", `\u0E44\u0E1F\u0E25\u0E4C\u0E41\u0E19\u0E1A\u0E43\u0E2B\u0E0D\u0E48\u0E40\u0E01\u0E34\u0E19 ${formatFileSize(maxBytes)} (\u0E44\u0E1F\u0E25\u0E4C\u0E19\u0E35\u0E49 ${formatFileSize(size)}) \u0E01\u0E23\u0E38\u0E13\u0E32\u0E22\u0E48\u0E2D\u0E44\u0E1F\u0E25\u0E4C\u0E2B\u0E23\u0E37\u0E2D\u0E2A\u0E41\u0E01\u0E19\u0E43\u0E2B\u0E49\u0E04\u0E27\u0E32\u0E21\u0E25\u0E30\u0E40\u0E2D\u0E35\u0E22\u0E14\u0E15\u0E48\u0E33\u0E25\u0E07`);
+      return check.result(empty);
+    }
+    const kind = sniffAttachmentKind(base64Head(dataBase64), name);
+    if (kind === null) {
+      check.fail("attachment", `\u0E41\u0E19\u0E1A\u0E44\u0E14\u0E49\u0E40\u0E09\u0E1E\u0E32\u0E30 ${ATTACHMENT_TYPES_TEXT} \u0E41\u0E25\u0E30\u0E40\u0E19\u0E37\u0E49\u0E2D\u0E44\u0E1F\u0E25\u0E4C\u0E15\u0E49\u0E2D\u0E07\u0E15\u0E23\u0E07\u0E01\u0E31\u0E1A\u0E19\u0E32\u0E21\u0E2A\u0E01\u0E38\u0E25`);
+      return check.result(empty);
+    }
+    return check.result({ name, mimeType: ATTACHMENT_MIME[kind], size, kind, dataBase64 });
+  }
+  function formatFileSize(bytes) {
+    if (bytes < 1024) return `${bytes} \u0E44\u0E1A\u0E15\u0E4C`;
+    if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+    const mb = bytes / (1024 * 1024);
+    return `${mb >= 10 ? Math.round(mb) : Math.round(mb * 10) / 10} MB`;
+  }
+  function attachmentMetaFromRow(row2) {
+    var _a, _b, _c;
+    const name = String((_a = row2.attachmentName) != null ? _a : "");
+    if (name === "" || String((_b = row2.attachmentFileId) != null ? _b : "") === "") return null;
+    return { name, mimeType: String((_c = row2.attachmentMime) != null ? _c : ""), size: Number(row2.attachmentSize) || 0 };
+  }
+
+  // shared/domain/line-message.ts
+  var THAI_DAYS = ["\u0E2D\u0E32\u0E17\u0E34\u0E15\u0E22\u0E4C", "\u0E08\u0E31\u0E19\u0E17\u0E23\u0E4C", "\u0E2D\u0E31\u0E07\u0E04\u0E32\u0E23", "\u0E1E\u0E38\u0E18", "\u0E1E\u0E24\u0E2B\u0E31\u0E2A\u0E1A\u0E14\u0E35", "\u0E28\u0E38\u0E01\u0E23\u0E4C", "\u0E40\u0E2A\u0E32\u0E23\u0E4C"];
+  var THAI_MONTHS = ["\u0E21\u0E01\u0E23\u0E32\u0E04\u0E21", "\u0E01\u0E38\u0E21\u0E20\u0E32\u0E1E\u0E31\u0E19\u0E18\u0E4C", "\u0E21\u0E35\u0E19\u0E32\u0E04\u0E21", "\u0E40\u0E21\u0E29\u0E32\u0E22\u0E19", "\u0E1E\u0E24\u0E29\u0E20\u0E32\u0E04\u0E21", "\u0E21\u0E34\u0E16\u0E38\u0E19\u0E32\u0E22\u0E19", "\u0E01\u0E23\u0E01\u0E0E\u0E32\u0E04\u0E21", "\u0E2A\u0E34\u0E07\u0E2B\u0E32\u0E04\u0E21", "\u0E01\u0E31\u0E19\u0E22\u0E32\u0E22\u0E19", "\u0E15\u0E38\u0E25\u0E32\u0E04\u0E21", "\u0E1E\u0E24\u0E28\u0E08\u0E34\u0E01\u0E32\u0E22\u0E19", "\u0E18\u0E31\u0E19\u0E27\u0E32\u0E04\u0E21"];
+  var THAI_MONTHS_SHORT = ["\u0E21.\u0E04.", "\u0E01.\u0E1E.", "\u0E21\u0E35.\u0E04.", "\u0E40\u0E21.\u0E22.", "\u0E1E.\u0E04.", "\u0E21\u0E34.\u0E22.", "\u0E01.\u0E04.", "\u0E2A.\u0E04.", "\u0E01.\u0E22.", "\u0E15.\u0E04.", "\u0E1E.\u0E22.", "\u0E18.\u0E04."];
+  function thaiLongDate(dateKey) {
+    const [year, month, day] = dateKey.split("-").map(Number);
+    return `\u0E27\u0E31\u0E19${THAI_DAYS[dayOfWeekOfDateKey(dateKey)]}\u0E17\u0E35\u0E48 ${day} ${THAI_MONTHS[month - 1]} ${year + 543}`;
+  }
+  function thaiShortDate(dateKey) {
+    const [year, month, day] = dateKey.split("-").map(Number);
+    return `${day} ${THAI_MONTHS_SHORT[month - 1]} ${String(year + 543).slice(-2)}`;
+  }
+  var hhmm = (minutes) => `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+  function durationThai(minutes) {
+    const hours = Math.floor(minutes / 60);
+    const rest = minutes % 60;
+    return [hours ? `${hours} \u0E0A\u0E31\u0E48\u0E27\u0E42\u0E21\u0E07` : "", rest ? `${rest} \u0E19\u0E32\u0E17\u0E35` : ""].filter(Boolean).join(" ");
+  }
+  function timeRangeThai(startMin, endMin) {
+    return `${hhmm(startMin)} - ${hhmm(endMin)} \u0E19.`;
+  }
+  function isSafeSiteUrl(url) {
+    return /^https:\/\/[A-Za-z0-9.-]+(?::\d+)?(\/[A-Za-z0-9._~%!$&'()*+,;=:@/-]*)?$/.test(url) && url.length <= 300;
+  }
+  function normalizeSiteUrl(url) {
+    const base = url.split("#")[0].split("?")[0];
+    return base.endsWith("/") ? base : `${base}/`;
+  }
+  function siteLink(siteUrl, hashPath) {
+    return `${normalizeSiteUrl(siteUrl)}?openExternalBrowser=1#${hashPath}`;
+  }
+  function attachmentPagePath(bookingId) {
+    return `/attachment/${encodeURIComponent(bookingId)}`;
+  }
+  var LINE_TARGET_PATTERN = /^[UCR][0-9a-f]{32}$/;
+  function parseLineTargets(raw) {
+    const ids = raw.split(/[\s,]+/).map((item) => item.trim()).filter(Boolean);
+    return ids.filter((id, index) => LINE_TARGET_PATTERN.test(id) && ids.indexOf(id) === index);
+  }
+  function lineTargetKind(id) {
+    return id.startsWith("C") ? "\u0E01\u0E25\u0E38\u0E48\u0E21" : id.startsWith("R") ? "\u0E2B\u0E49\u0E2D\u0E07\u0E41\u0E0A\u0E15" : "\u0E1C\u0E39\u0E49\u0E43\u0E0A\u0E49";
+  }
+  function clean(text, max) {
+    const single = String(text != null ? text : "").replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, "").replace(/\s+/g, " ").trim();
+    return single.length > max ? `${single.slice(0, max - 1)}\u2026` : single || "-";
+  }
+  function statusLine(info) {
+    if (info.status === "pending") {
+      const step = APPROVAL_STEPS[Math.min(Math.max(info.approvalStep, 1), APPROVAL_STEPS.length) - 1];
+      return { text: `\u0E23\u0E2D\u0E2D\u0E19\u0E38\u0E21\u0E31\u0E15\u0E34 \xB7 \u0E02\u0E31\u0E49\u0E19\u0E17\u0E35\u0E48 ${step.step} ${step.waiting}`, color: "#FDE68A" };
+    }
+    return { text: BOOKING_STATUS_LABEL_TH[info.status], color: "#BBF7D0" };
+  }
+  function row(label, value, options = {}) {
+    var _a;
+    return {
+      type: "box",
+      layout: "baseline",
+      spacing: "md",
+      contents: [
+        { type: "text", text: label, size: "sm", color: "#6B7280", flex: 2 },
+        { type: "text", text: value, size: "sm", color: (_a = options.color) != null ? _a : "#111827", weight: options.bold ? "bold" : "regular", flex: 5, wrap: true }
+      ]
+    };
+  }
+  function bookingLineMessage(info, siteUrl) {
+    const status = statusLine(info);
+    const date = thaiLongDate(info.dateKey);
+    const time = timeRangeThai(info.startMin, info.endMin);
+    const booker = clean(info.bookerName, 80);
+    const room = clean(info.roomName, 80);
+    const canLink = isSafeSiteUrl(normalizeSiteUrl(siteUrl));
+    const body = [
+      { type: "text", text: clean(info.title, 160), weight: "bold", size: "lg", wrap: true, color: "#111827" },
+      { type: "separator", margin: "lg" },
+      {
+        type: "box",
+        layout: "vertical",
+        spacing: "md",
+        margin: "lg",
+        contents: [
+          row("\u0E27\u0E31\u0E19\u0E17\u0E35\u0E48", date, { bold: true }),
+          row("\u0E40\u0E27\u0E25\u0E32", `${time} (${durationThai(info.endMin - info.startMin)})`, { bold: true }),
+          row("\u0E1C\u0E39\u0E49\u0E08\u0E2D\u0E07", info.department ? `${booker}
+${clean(info.department, 80)}` : booker),
+          row("\u0E2B\u0E49\u0E2D\u0E07", room),
+          row("\u0E40\u0E2D\u0E01\u0E2A\u0E32\u0E23", info.attachment ? `${clean(info.attachment.name, 80)} (${formatFileSize(info.attachment.size)})` : "\u0E44\u0E21\u0E48\u0E21\u0E35\u0E40\u0E2D\u0E01\u0E2A\u0E32\u0E23\u0E41\u0E19\u0E1A", { color: info.attachment ? "#1E3A8A" : "#9CA3AF" })
+        ]
+      }
+    ];
+    const buttons = [];
+    if (canLink && info.attachment) {
+      buttons.push({
+        type: "button",
+        style: "primary",
+        color: "#1E3A8A",
+        height: "sm",
+        action: { type: "uri", label: "\u0E40\u0E1B\u0E34\u0E14\u0E40\u0E2D\u0E01\u0E2A\u0E32\u0E23\u0E41\u0E19\u0E1A", uri: siteLink(siteUrl, attachmentPagePath(info.bookingId)) }
+      });
+    }
+    if (canLink) {
+      buttons.push({
+        type: "button",
+        style: info.attachment ? "secondary" : "primary",
+        color: info.attachment ? void 0 : "#1E3A8A",
+        height: "sm",
+        action: { type: "uri", label: info.status === "pending" ? "\u0E14\u0E39\u0E04\u0E33\u0E02\u0E2D\u0E23\u0E2D\u0E2D\u0E19\u0E38\u0E21\u0E31\u0E15\u0E34" : "\u0E14\u0E39\u0E1B\u0E0F\u0E34\u0E17\u0E34\u0E19\u0E01\u0E32\u0E23\u0E08\u0E2D\u0E07", uri: siteLink(siteUrl, info.status === "pending" ? "/approvals" : "/calendar") }
+      });
+    }
+    const footerNote = info.attachment && canLink ? "\u0E40\u0E1B\u0E34\u0E14\u0E40\u0E2D\u0E01\u0E2A\u0E32\u0E23\u0E44\u0E14\u0E49\u0E40\u0E09\u0E1E\u0E32\u0E30\u0E1C\u0E39\u0E49\u0E21\u0E35\u0E2A\u0E34\u0E17\u0E18\u0E34\u0E4C \u0E15\u0E49\u0E2D\u0E07\u0E40\u0E02\u0E49\u0E32\u0E2A\u0E39\u0E48\u0E23\u0E30\u0E1A\u0E1A\u0E01\u0E48\u0E2D\u0E19" : "";
+    const altText = `\u0E08\u0E2D\u0E07\u0E2B\u0E49\u0E2D\u0E07\u0E1B\u0E23\u0E30\u0E0A\u0E38\u0E21\u0E2A\u0E33\u0E40\u0E23\u0E47\u0E08: ${room} ${thaiShortDate(info.dateKey)} ${time} \u0E42\u0E14\u0E22 ${booker}${info.attachment ? " (\u0E21\u0E35\u0E40\u0E2D\u0E01\u0E2A\u0E32\u0E23\u0E41\u0E19\u0E1A)" : ""}`;
+    return {
+      type: "flex",
+      altText: altText.length > 400 ? `${altText.slice(0, 399)}\u2026` : altText,
+      contents: {
+        type: "bubble",
+        size: "mega",
+        header: {
+          type: "box",
+          layout: "vertical",
+          backgroundColor: "#1E3A8A",
+          paddingAll: "lg",
+          spacing: "xs",
+          contents: [
+            { type: "text", text: "\u0E08\u0E2D\u0E07\u0E2B\u0E49\u0E2D\u0E07\u0E1B\u0E23\u0E30\u0E0A\u0E38\u0E21\u0E2A\u0E33\u0E40\u0E23\u0E47\u0E08", color: "#FFFFFF", weight: "bold", size: "md" },
+            { type: "text", text: status.text, color: status.color, size: "sm", wrap: true }
+          ]
+        },
+        body: { type: "box", layout: "vertical", paddingAll: "lg", contents: body },
+        ...buttons.length ? {
+          footer: {
+            type: "box",
+            layout: "vertical",
+            spacing: "sm",
+            paddingAll: "lg",
+            contents: [
+              ...buttons.map((button) => JSON.parse(JSON.stringify(button))),
+              ...footerNote ? [{ type: "text", text: footerNote, size: "xxs", color: "#9CA3AF", align: "center", wrap: true, margin: "sm" }] : []
+            ]
+          }
+        } : {}
+      }
+    };
+  }
+
+  // shared/domain/admin-booking.ts
+  var RESET_CONFIRM_PHRASE = "\u0E25\u0E49\u0E32\u0E07\u0E02\u0E49\u0E2D\u0E21\u0E39\u0E25";
+  var ADMIN_EDITABLE_FIELDS = [
+    "roomId",
+    "dateKey",
+    "startMin",
+    "endMin",
+    "title",
+    "bookerName",
+    "department",
+    "requesterPosition",
+    "requesterPhone",
+    "attendees",
+    "note",
+    "customLocation"
+  ];
+  function mergeAdminEdit(existing, raw) {
+    const input = asRecord(raw);
+    const bookingId = typeof input.bookingId === "string" ? input.bookingId.trim() : "";
+    if (bookingId === "") return { ok: false, issues: [{ field: "bookingId", message: "\u0E44\u0E21\u0E48\u0E44\u0E14\u0E49\u0E23\u0E30\u0E1A\u0E38\u0E23\u0E32\u0E22\u0E01\u0E32\u0E23\u0E08\u0E2D\u0E07" }] };
+    const merged = { ...existing, termsAccepted: true };
+    for (const field of ADMIN_EDITABLE_FIELDS) {
+      if (input[field] !== void 0) merged[field] = input[field];
+    }
+    const parsed = validateBookingRequest(merged);
+    if (!parsed.ok) return parsed;
+    const changes = ADMIN_EDITABLE_FIELDS.filter((field) => String(existing[field]) !== String(parsed.value[field])).map((field) => ({ field, from: existing[field], to: parsed.value[field] }));
+    return { ok: true, value: { bookingId, request: parsed.value, changes } };
+  }
+  function adminEditRuleIssues(request, context) {
+    const result = validateBookingRules(request, {
+      ...context,
+      settings: { ...context.settings, allowAdminBackdate: true },
+      isAdmin: true,
+      activeBookingCount: 0
+    });
+    if (result.ok) return [];
+    return result.issues.filter((issue) => !["IN_THE_PAST", "LEAD_TIME_TOO_SHORT", "QUOTA_EXCEEDED"].includes(issue.code));
+  }
+  function editConflicts(rows, bookingId, request, normalizeDateKey2 = (value) => String(value)) {
+    return rows.filter(
+      (row2) => String(row2.bookingId) !== bookingId && String(row2.roomId) === request.roomId && normalizeDateKey2(row2.dateKey) === request.dateKey && ["pending", "confirmed"].includes(String(row2.status)) && overlaps(request, { startMin: Number(row2.startMin), endMin: Number(row2.endMin) })
+    );
   }
   return __toCommonJS(index_exports);
 })();
