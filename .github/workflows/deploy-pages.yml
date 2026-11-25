@@ -58,10 +58,11 @@ jobs:
 
       - name: build หน้าเว็บ
         working-directory: web
-        # ถ้ายังไม่ตั้งค่านี้ใน Settings > Secrets and variables > Actions > Variables
-        # หน้าเว็บจะ build ออกมาเป็นโหมดสาธิตโดยอัตโนมัติ และบอกผู้ใช้ตรง ๆ ว่ายังไม่เชื่อมต่อ
+        # Web App URL ของ Apps Script (ฐานข้อมูลจริง) — ไม่ใช่ความลับ ทุกคนเห็นได้ในหน้าเว็บอยู่แล้ว
+        # จะเปลี่ยนไปใช้ deployment อื่น ให้ตั้ง Settings > Secrets and variables > Actions > Variables > VITE_API_URL
+        # (ค่าในตัวแปรมาก่อนค่าที่เขียนไว้ตรงนี้)
         env:
-          VITE_API_URL: ${{ vars.VITE_API_URL }}
+          VITE_API_URL: ${{ vars.VITE_API_URL || 'https://script.google.com/macros/s/AKfycbxg3jLprH20uUUymdaaSiP59kJfhYc1pt43f_tUURogH7I3E0OpEJsZrpHsuvclSSzxag/exec' }}
         run: npm run build
 
       - uses: actions/configure-pages@v5
