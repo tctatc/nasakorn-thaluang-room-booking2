@@ -15,6 +15,11 @@ export interface SessionUser {
   status: UserStatus;
   /** ห้องที่จองได้ — ว่าง = ทุกห้อง */
   allowedRoomIds: string[];
+  /** เบอร์โทร — เติมแบบฟอร์มจองให้อัตโนมัติ (server รุ่นเก่าไม่ส่งมา) */
+  phone?: string;
+  /** ผู้ดูแลตั้งรหัสให้ ต้องตั้งรหัสผ่าน / PIN ใหม่เองก่อนใช้งานอื่น */
+  mustChangePassword?: boolean;
+  mustChangePin?: boolean;
 }
 
 /** ข้อมูลบัญชีที่ผู้ดูแลเห็นในหน้าจัดการผู้ใช้ (ไม่มี PIN หรือ hash ติดมา) */
@@ -51,6 +56,7 @@ export type ApiErrorCode =
   | 'VALIDATION'
   | 'BUSY'
   | 'NOT_CONFIGURED'
+  | 'CHANGE_REQUIRED'
   | 'INTERNAL'
   | 'NETWORK';
 

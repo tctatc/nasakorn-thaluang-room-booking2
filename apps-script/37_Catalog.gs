@@ -18,7 +18,49 @@ function readLookups_() {
 }
 
 function listLookups_() {
+  addMissingDepartments_(false);
   return { lookups: Domain.sortLookups(readLookups_()) };
+}
+
+/** รุ่นของรายชื่อแผนกตั้งต้น — เปลี่ยนเมื่อแก้รายการใน shared/schemas/lookup.ts เพื่อให้เติมรอบใหม่ */
+const DEPARTMENT_SEED_VERSION = '2570.1';
+const PROP_DEPARTMENT_SEED = 'DEPARTMENT_SEED';
+
+/**
+ * เติมแผนก/ฝ่ายตั้งต้นที่ยังไม่มีในชีต (เทียบด้วยรหัส รวมรายการที่ผู้ดูแลลบไปแล้ว จึงไม่ฟื้นของที่ตั้งใจลบ)
+ * ทำครั้งเดียวต่อรุ่นรายชื่อ — ครั้งต่อไปแค่อ่าน Script Property แล้วจบ
+ */
+function addMissingDepartments_(force) {
+  if (!force && getProp_(PROP_DEPARTMENT_SEED) === DEPARTMENT_SEED_VERSION) return 'รายชื่อแผนกเป็นรุ่นล่าสุดแล้ว';
+  return withScriptLock_(function () {
+    if (!force && getProp_(PROP_DEPARTMENT_SEED) === DEPARTMENT_SEED_VERSION) return 'รายชื่อแผนกเป็นรุ่นล่าสุดแล้ว';
+    const rows = readAll_(Domain.SHEET_LOOKUPS).objects;
+    const existing = rows.map(function (row) {
+      return { kind: String(row.kind), key: String(row.key) };
+    });
+    // แผนกตั้งต้นที่ผู้ดูแลไม่เคยแก้ (updatedAt = createdAt) เรียงตามลำดับใหม่ (อุตสาหกรรม → ดิจิทัล → พาณิชย์ → สามัญ → ฝ่าย/งาน)
+    // รายการที่ผู้ดูแลแก้แล้วอยู่ที่เดิม — ไม่แตะ updatedAt จึงยังนับว่า "ไม่เคยแก้"
+    let reordered = 0;
+    const defaults = Domain.defaultLookups().filter(function (item) { return item.kind === 'department'; });
+    rows.forEach(function (row) {
+      if (String(row.kind) !== 'department' || row.archivedAt || String(row.updatedAt) !== String(row.createdAt)) return;
+      const target = defaults.filter(function (item) { return item.key === String(row.key); })[0];
+      if (target && Number(row.sortOrder) !== target.sortOrder) {
+        updateByKey_(Domain.SHEET_LOOKUPS, String(row.lookupId), { sortOrder: target.sortOrder });
+        reordered += 1;
+      }
+    });
+    const now = nowIso_();
+    const missing = Domain.missingDefaultLookups(existing, 'department').map(function (item) {
+      return Object.assign({}, item, { createdAt: now, updatedAt: now, archivedAt: '' });
+    });
+    if (missing.length > 0) appendObjects_(Domain.SHEET_LOOKUPS, missing);
+    if (missing.length > 0 || reordered > 0) bumpDataVersion_();
+    scriptProps_().setProperty(PROP_DEPARTMENT_SEED, DEPARTMENT_SEED_VERSION);
+    return missing.length > 0
+      ? `เพิ่มแผนก/ฝ่ายที่ยังไม่มี ${missing.length} รายการ: ${missing.map(function (item) { return item.label; }).join(', ')}`
+      : `มีแผนก/ฝ่ายตั้งต้นครบแล้ว${reordered > 0 ? ` (จัดลำดับใหม่ ${reordered} รายการ)` : ''}`;
+  });
 }
 
 function saveLookup_(admin, raw) {

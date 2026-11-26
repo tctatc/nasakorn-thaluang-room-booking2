@@ -57,7 +57,29 @@ const loginText = (iso: string) => iso === ''
   : `เข้าล่าสุด ${new Intl.DateTimeFormat('th-TH', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Bangkok' }).format(new Date(iso))}`;
 
 /** รหัสที่เพิ่งออกให้ — ช่องที่ไม่ได้เปลี่ยนเป็น undefined */
-interface Issued { displayName: string; username: string; pin?: string; password?: string }
+interface Issued { displayName: string; username: string; pin?: string; password?: string; requireChange?: boolean }
+
+/**
+ * ติ๊ก = เจ้าของบัญชีต้องตั้งค่าใหม่เองก่อนใช้งานอื่น (server บังคับ) ผู้ดูแลจึงไม่รู้รหัสที่เขาใช้จริง
+ * ติ๊กไว้เป็นค่าเริ่มต้น ยกเว้นรีเซ็ตของตัวเอง
+ */
+const REQUIRE_CHANGE_TEXT = {
+  'รหัสผ่านและ PIN': 'ให้เจ้าของบัญชีตั้งรหัสผ่านและ PIN ใหม่เองตอนเข้าครั้งแรก',
+  'รหัสผ่าน': 'ให้เจ้าของบัญชีตั้งรหัสผ่านใหม่เองตอนเข้าครั้งแรก',
+  PIN: 'ให้เจ้าของบัญชีตั้ง PIN ใหม่เองตอนเข้าครั้งแรก',
+} as const;
+
+function RequireChangeToggle({ checked, onChange, what }: { checked: boolean; onChange: (value: boolean) => void; what: 'รหัสผ่านและ PIN' | 'รหัสผ่าน' | 'PIN' }) {
+  return (
+    <label className="flex cursor-pointer items-start gap-3 rounded-control bg-surface-sunken px-3 py-3">
+      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="mt-0.5 size-4 shrink-0 accent-brand" />
+      <span className="min-w-0 text-sm">
+        <span className="block font-medium text-ink">{REQUIRE_CHANGE_TEXT[what]}</span>
+        <span className="block text-ink-muted">เข้าด้วยค่าที่ให้ไปแล้ว ระบบจะให้ตั้งของตัวเองก่อนใช้งานอย่างอื่น ผู้ดูแลจะไม่รู้ค่าที่เขาตั้ง</span>
+      </span>
+    </label>
+  );
+}
 type DoneFn = (message: string, credential?: Issued) => void;
 
 type Panel =
@@ -122,7 +144,10 @@ export function UsersPage() {
             {issued.pin !== undefined && <p>PIN <strong className="font-semibold tabular-nums tracking-[0.2em]">{issued.pin}</strong></p>}
             <Button size="sm" variant="secondary" onClick={() => setIssued(null)}>จดแล้ว ปิดข้อความนี้</Button>
           </div>
-          <p className="mt-1 text-sm">ส่งให้เจ้าของบัญชีโดยตรง ปิดข้อความนี้แล้วดูย้อนหลังไม่ได้</p>
+          <p className="mt-1 text-sm">
+            ส่งให้เจ้าของบัญชีโดยตรง ปิดข้อความนี้แล้วดูย้อนหลังไม่ได้
+            {issued.requireChange && ' · เป็นค่าใช้ครั้งแรก เขาจะต้องตั้งของตัวเองใหม่ตอนเข้าสู่ระบบ'}
+          </p>
         </Alert>
       )}
 
@@ -169,9 +194,10 @@ export function UsersPage() {
                       <Badge tone={ROLE_TONE[user.role]}>{USER_ROLE_LABEL_TH[user.role]}</Badge>
                       {user.status !== 'active' && <Badge tone="danger">ปิดการใช้งาน</Badge>}
                       {user.email === me.email && <Badge>คุณ</Badge>}
+                      {(user.mustChangePassword || user.mustChangePin) && <Badge tone="warn">รอเจ้าของตั้งรหัสเอง</Badge>}
                     </div>
                     <p className="mt-0.5 text-sm text-ink-muted">
-                      {[user.email, user.position, user.department].filter(Boolean).join(' · ')}
+                      {[user.email, user.position, user.department, user.phone].filter(Boolean).join(' · ')}
                     </p>
                     <p className="mt-0.5 text-xs text-ink-subtle">
                       {user.role === 'admin' || user.allowedRoomIds.length === 0
@@ -198,8 +224,8 @@ export function UsersPage() {
       {(panel?.kind === 'create' || panel?.kind === 'edit') && (
         <UserFormDialog user={panel.kind === 'edit' ? panel.user : null} isSelf={panel.kind === 'edit' && panel.user.email === me.email} rooms={rooms} onClose={close} onDone={done} />
       )}
-      {panel?.kind === 'pin' && <ResetPinDialog user={panel.user} onClose={close} onDone={done} />}
-      {panel?.kind === 'password' && <ResetPasswordDialog user={panel.user} onClose={close} onDone={done} />}
+      {panel?.kind === 'pin' && <ResetPinDialog user={panel.user} isSelf={panel.user.email === me.email} onClose={close} onDone={done} />}
+      {panel?.kind === 'password' && <ResetPasswordDialog user={panel.user} isSelf={panel.user.email === me.email} onClose={close} onDone={done} />}
       {panel?.kind === 'delete' && <DeleteUserDialog user={panel.user} onClose={close} onDone={done} />}
     </div>
   );
@@ -214,6 +240,8 @@ function UserFormDialog({
   const [displayName, setDisplayName] = useState(user?.displayName ?? '');
   const [department, setDepartment] = useState(user?.department ?? '');
   const [position, setPosition] = useState(user?.position ?? '');
+  const [phone, setPhone] = useState(user?.phone ?? '');
+  const [requireChange, setRequireChange] = useState(true);
   const lookups = useLookups();
   const [role, setRole] = useState<UserRole>(user?.role ?? 'staff');
   const [active, setActive] = useState((user?.status ?? 'active') === 'active');
@@ -229,8 +257,8 @@ function UserFormDialog({
   const submit = (event: FormEvent) => {
     event.preventDefault();
     const input = {
-      username, displayName, department, position, role, status: active ? 'active' : 'disabled',
-      allowedRoomIds: limitRooms && role !== 'admin' ? roomIds : [], pin, password,
+      username, displayName, department, position, phone, role, status: active ? 'active' : 'disabled',
+      allowedRoomIds: limitRooms && role !== 'admin' ? roomIds : [], pin, password, requireChange: creating && requireChange,
     } as const;
     if (limitRooms && role !== 'admin' && roomIds.length === 0) { setError('เลือกห้องอย่างน้อย 1 ห้อง หรือเลือก "ทุกห้อง"'); return; }
     const parsed = validateUserAccountInput(input, { requirePin: creating });
@@ -240,7 +268,7 @@ function UserFormDialog({
     const { pin: newPin, password: newPassword, ...account } = parsed.value;
     (creating ? api.createUser(token, parsed.value) : api.updateUser(token, account))
       .then(() => (creating
-        ? onDone(`เพิ่ม ${account.displayName} แล้ว`, { displayName: account.displayName, username: account.username, password: newPassword, pin: newPin })
+        ? onDone(`เพิ่ม ${account.displayName} แล้ว`, { displayName: account.displayName, username: account.username, password: newPassword, pin: newPin, requireChange: account.requireChange })
         : onDone(`บันทึก ${account.displayName} แล้ว`)))
       .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : 'บันทึกไม่สำเร็จ'))
       .finally(() => setBusy(false));
@@ -286,6 +314,10 @@ function UserFormDialog({
             <input id="uf-position" list="uf-position-options" className={inputClass} value={position} onChange={(event) => setPosition(event.target.value)} maxLength={100} placeholder="เลือกหรือพิมพ์" />
             <datalist id="uf-position-options">{lookups.active('position').map((item) => <option key={item.lookupId} value={item.label} />)}</datalist>
           </div>
+          <div>
+            <label className={labelClass} htmlFor="uf-phone">เบอร์โทร <span className="font-normal text-ink-subtle">(ถ้ามี · เจ้าของแก้เองได้)</span></label>
+            <input id="uf-phone" type="tel" inputMode="tel" autoComplete="off" className={inputClass} value={phone} onChange={(event) => setPhone(event.target.value)} maxLength={30} placeholder="081-234-5678" />
+          </div>
         </div>
 
         {creating && (
@@ -314,6 +346,8 @@ function UserFormDialog({
             </div>
           </div>
         )}
+
+        {creating && <RequireChangeToggle checked={requireChange} onChange={setRequireChange} what="รหัสผ่านและ PIN" />}
 
         <fieldset className="min-w-0">
           <legend className={labelClass}>สิทธิ์การใช้งาน</legend>
@@ -376,9 +410,10 @@ function UserFormDialog({
   );
 }
 
-function ResetPinDialog({ user, onClose, onDone }: { user: AdminUser; onClose: () => void; onDone: DoneFn }) {
+function ResetPinDialog({ user, isSelf, onClose, onDone }: { user: AdminUser; isSelf: boolean; onClose: () => void; onDone: DoneFn }) {
   const { api, token } = useApp();
   const [pin, setPin] = useState(randomPin);
+  const [requireChange, setRequireChange] = useState(!isSelf);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -388,8 +423,8 @@ function ResetPinDialog({ user, onClose, onDone }: { user: AdminUser; onClose: (
     if (problem !== null) { setError(problem); return; }
     setBusy(true);
     setError(null);
-    api.resetUserPin(token, user.email, pin)
-      .then(() => onDone(`ตั้ง PIN ใหม่ของ ${user.displayName} แล้ว`, { displayName: user.displayName, username: user.email, pin }))
+    api.resetUserPin(token, user.email, pin, requireChange)
+      .then(() => onDone(`ตั้ง PIN ใหม่ของ ${user.displayName} แล้ว`, { displayName: user.displayName, username: user.email, pin, requireChange }))
       .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : 'รีเซ็ต PIN ไม่สำเร็จ'))
       .finally(() => setBusy(false));
   };
@@ -416,14 +451,16 @@ function ResetPinDialog({ user, onClose, onDone }: { user: AdminUser; onClose: (
           <Button variant="secondary" icon={<Shuffle className="size-4" />} onClick={() => setPin(randomPin())}>สุ่มใหม่</Button>
         </div>
         <p className="text-sm text-ink-muted">ห้ามเลขซ้ำทั้งหมดหรือเลขเรียง เช่น 000000, 123456</p>
+        <RequireChangeToggle checked={requireChange} onChange={setRequireChange} what="PIN" />
       </form>
     </Dialog>
   );
 }
 
-function ResetPasswordDialog({ user, onClose, onDone }: { user: AdminUser; onClose: () => void; onDone: DoneFn }) {
+function ResetPasswordDialog({ user, isSelf, onClose, onDone }: { user: AdminUser; isSelf: boolean; onClose: () => void; onDone: DoneFn }) {
   const { api, token } = useApp();
   const [password, setPassword] = useState(randomPassword);
+  const [requireChange, setRequireChange] = useState(!isSelf);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -433,8 +470,8 @@ function ResetPasswordDialog({ user, onClose, onDone }: { user: AdminUser; onClo
     if (problem !== null) { setError(problem); return; }
     setBusy(true);
     setError(null);
-    api.resetUserPassword(token, user.email, password)
-      .then(() => onDone(`ตั้งรหัสผ่านใหม่ของ ${user.displayName} แล้ว`, { displayName: user.displayName, username: user.email, password }))
+    api.resetUserPassword(token, user.email, password, requireChange)
+      .then(() => onDone(`ตั้งรหัสผ่านใหม่ของ ${user.displayName} แล้ว`, { displayName: user.displayName, username: user.email, password, requireChange }))
       .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : 'รีเซ็ตรหัสผ่านไม่สำเร็จ'))
       .finally(() => setBusy(false));
   };
@@ -461,6 +498,7 @@ function ResetPasswordDialog({ user, onClose, onDone }: { user: AdminUser; onClo
           <Button variant="secondary" icon={<Shuffle className="size-4" />} onClick={() => setPassword(randomPassword())}>สุ่มใหม่</Button>
         </div>
         <p className="text-sm text-ink-muted">อย่างน้อย {PASSWORD_MIN_LENGTH} ตัว มีทั้งตัวอักษรภาษาอังกฤษและตัวเลข</p>
+        <RequireChangeToggle checked={requireChange} onChange={setRequireChange} what="รหัสผ่าน" />
       </form>
     </Dialog>
   );

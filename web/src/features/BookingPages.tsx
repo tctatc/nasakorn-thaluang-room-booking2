@@ -149,7 +149,7 @@ function CalendarBookingDialog({draft,rooms,settings,busy,error,onClose,onTimeCh
   const [end,setEnd]=useState(timeText(Math.min(draft.startMin+60,18*60)));
   const user=useCurrentUser();
   const [bookerName,setBookerName]=useState(''); const [attendees,setAttendees]=useState('2'); const [note,setNote]=useState('');
-  const lookups=useLookups(); const [position,setPosition]=useState(user.position); const [department,setDepartment]=useState(user.department); const [phone,setPhone]=useState(''); const [title,setTitle]=useState(''); const [customLocation,setCustomLocation]=useState('');
+  const lookups=useLookups(); const [position,setPosition]=useState(user.position); const [department,setDepartment]=useState(user.department); const [phone,setPhone]=useState(user.phone ?? ''); const [title,setTitle]=useState(''); const [customLocation,setCustomLocation]=useState('');
   const [requestedFacilities,setRequestedFacilities]=useState<RequestFacility[]>([]); const [extraFurnitureCount,setExtraFurnitureCount]=useState('0'); const [otherFacility,setOtherFacility]=useState(''); const [termsAccepted,setTermsAccepted]=useState(false);
   useEffect(()=>{if(!roomId&&activeRooms.length)setRoomId(activeRooms[0]!.roomId);},[activeRooms,roomId]);
   const room=activeRooms.find((item)=>item.roomId===roomId);

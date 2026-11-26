@@ -19,6 +19,14 @@ import { ReportsPage } from '../features/reports/ReportsPage';
 import { AttachmentPage } from '../features/attachment/AttachmentPage';
 import { canSeeAllBookings } from '@shared/domain/approval';
 import { useApp } from './providers/AppProvider';
+import { ForceChangePage } from '../features/account/ForceChangePage';
+import { MyPage } from '../features/account/MyPage';
+
+/** หน้าแรกหลังเข้าสู่ระบบ: ผู้ใช้งานทั่วไปเห็นหน้าของฉัน (คำขอของตัวเอง) ผู้ลงนามและผู้ดูแลเห็นภาพรวมทั้งระบบ */
+function HomePage() {
+  const { user } = useApp();
+  return user?.role === 'staff' ? <MyPage asHome /> : <DashboardPage />;
+}
 
 /** หน้าของผู้ดูแลเท่านั้น — คนอื่นพิมพ์ URL เข้ามาเองจะถูกพากลับหน้าภาพรวม (server ตรวจสิทธิ์ซ้ำทุกคำสั่งอยู่แล้ว) */
 function AdminOnly({ children }: { children: ReactNode }) {
@@ -36,7 +44,7 @@ function AllBookingsOnly({ children }: { children: ReactNode }) {
 function StaffPathOrHome() {
   const { pathname, search } = useLocation();
   // หน้าเอกสารแนบ (ลิงก์จาก LINE) ต้องเข้าสู่ระบบก่อนเสมอ
-  const staffPath = pathname.startsWith('/attachment/') || NAV_ITEMS.some((item) => item.path !== '/' && pathname.startsWith(item.path));
+  const staffPath = pathname.startsWith('/attachment/') || pathname === '/me' || NAV_ITEMS.some((item) => item.path !== '/' && pathname.startsWith(item.path));
   // จำหน้าที่ตั้งใจเปิดไว้ เข้าสู่ระบบแล้วพากลับไปหน้านั้น
   return staffPath ? <Navigate to="/login" replace state={{ from: `${pathname}${search}` }} /> : <Navigate to="/" replace />;
 }
@@ -48,7 +56,7 @@ function AfterLogin() {
 }
 
 export function App() {
-  const { phase } = useApp();
+  const { phase, user } = useApp();
 
   if (phase === 'booting') {
     return (
@@ -74,10 +82,16 @@ export function App() {
     );
   }
 
+  // ผู้ดูแลสั่งให้ตั้งรหัสใหม่เอง: ทุก URL มาที่หน้าตั้งรหัส (server ปฏิเสธคำสั่งอื่นอยู่แล้ว)
+  if (user !== null && (user.mustChangePassword === true || user.mustChangePin === true)) {
+    return <ForceChangePage />;
+  }
+
   return (
     <Routes>
       <Route element={<AppShell />}>
-        <Route path="/" element={<DashboardPage />} />
+        <Route path="/" element={<HomePage />} />
+        <Route path="/me" element={<MyPage />} />
         <Route path="/book" element={<BookingPage />} />
         <Route path="/calendar" element={<BookingsPage calendar />} />
         <Route path="/my-bookings" element={<BookingsPage />} />

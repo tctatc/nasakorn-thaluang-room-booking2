@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { CalendarCheck2, LogOut, Settings } from 'lucide-react';
+import { CalendarCheck2, LogOut, Settings, UserRound } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { USER_ROLE_LABEL_TH } from '@shared/schemas/user';
 import { cn } from '../../lib/cn';
 import { useApp } from '../../app/providers/AppProvider';
+import { nameInitial } from '../../lib/format/thai';
 import { ConnectionSettingsDialog } from './ConnectionSettingsDialog';
 import { TopNav } from './TopNav';
 
@@ -35,7 +37,7 @@ export function Topbar({ badges = {} }: { badges?: Record<string, number> }) {
     };
   }, [menuOpen]);
 
-  const initial = (user?.displayName ?? '?').trim().charAt(0) || '?';
+  const initial = nameInitial(user?.displayName ?? '?');
 
   return (
     <header className="app-chrome sticky top-0 z-[20] border-b border-line bg-surface/95 backdrop-blur">
@@ -110,6 +112,15 @@ export function Topbar({ badges = {} }: { badges?: Record<string, number> }) {
                 )}
               </div>
               <hr className="my-1 border-line" />
+              <Link
+                to="/me"
+                role="menuitem"
+                onClick={() => setMenuOpen(false)}
+                className="flex min-h-11 w-full items-center gap-2.5 rounded-inner px-2.5 text-sm text-ink transition-colors hover:bg-neutral-soft"
+              >
+                <UserRound className="size-4" aria-hidden="true" />
+                บัญชีของฉัน · เปลี่ยนรหัสผ่าน / PIN
+              </Link>
               <button
                 type="button"
                 role="menuitem"

@@ -275,6 +275,8 @@ describe('สิทธิ์ผู้ใช้', () => {
     fireEvent.change(within(dialog).getByLabelText(/PIN แรกเข้า/), { target: { value: '582039' } });
     await user.click(within(dialog).getByRole('radio', { name: 'เลือกเฉพาะบางห้อง' }));
     await user.click(within(dialog).getByRole('checkbox', { name: 'ห้องประชุมสักทอง' }));
+    // ทดสอบเรื่องห้อง ไม่ใช่การตั้งรหัสครั้งแรก (มีเทสแยก) — ยกเลิกการบังคับตั้งรหัสใหม่
+    await user.click(within(dialog).getByRole('checkbox', { name: /ตั้งรหัสผ่านและ PIN ใหม่เอง/ }));
     await user.click(within(dialog).getByRole('button', { name: 'เพิ่มผู้ใช้' }));
 
     // รหัสผ่านและ PIN ที่ออกให้ค้างอยู่บนหน้าจนกดรับทราบ
@@ -298,7 +300,8 @@ describe('สิทธิ์ผู้ใช้', () => {
     const row = screen.getByText('ครูทดลอง ใจดี', { selector: 'p' }).closest('li')!;
     await user.click(within(row).getByRole('button', { name: /รีเซ็ต PIN/ }));
     const dialog = await screen.findByRole('dialog');
-    fireEvent.change(within(dialog).getByLabelText(/PIN ใหม่/), { target: { value: '730264' } });
+    fireEvent.change(within(dialog).getByLabelText(/^PIN ใหม่/), { target: { value: '730264' } });
+    await user.click(within(dialog).getByRole('checkbox', { name: /ตั้ง PIN ใหม่เอง/ }));
     await user.click(within(dialog).getByRole('button', { name: 'ตั้ง PIN ใหม่' }));
     await screen.findByText('ข้อมูลเข้าสู่ระบบของ ครูทดลอง ใจดี', {}, { timeout: 3000 });
 
@@ -322,8 +325,73 @@ describe('สิทธิ์ผู้ใช้', () => {
     await signOutVia(user);
     await enterPassword('teacher');
     expect(await screen.findByText('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง', {}, { timeout: 3000 })).toBeDefined();
-    await signInAs('teacher', 'NewTeach88');
-  }, 30_000);
+
+    // ค่าเริ่มต้นของการรีเซ็ต = ให้เจ้าของตั้งเอง: เข้าด้วยรหัสที่ได้แล้วต้องตั้งรหัสของตัวเองก่อนเห็นเมนู
+    await enterPassword('teacher', 'NewTeach88');
+    expect(await screen.findByRole('heading', { level: 1, name: 'ตั้งรหัสผ่านของคุณก่อนเริ่มใช้งาน' }, { timeout: 5000 })).toBeDefined();
+    expect(screen.queryByRole('navigation', { name: 'เมนูหลัก' })).toBeNull();
+    // พิมพ์ URL หน้าอื่นเองก็ยังอยู่หน้าตั้งรหัส
+    window.location.hash = '#/my-bookings';
+    expect(await screen.findByRole('heading', { level: 1, name: 'ตั้งรหัสผ่านของคุณก่อนเริ่มใช้งาน' })).toBeDefined();
+
+    fireEvent.change(screen.getByLabelText('รหัสผ่านที่ได้รับจากผู้ดูแล'), { target: { value: 'NewTeach88' } });
+    fireEvent.change(screen.getByLabelText('รหัสผ่านใหม่'), { target: { value: 'NewTeach88' } });
+    fireEvent.change(screen.getByLabelText('พิมพ์รหัสผ่านใหม่อีกครั้ง'), { target: { value: 'NewTeach88' } });
+    await user.click(screen.getByRole('button', { name: 'บันทึก' }));
+    expect(await screen.findByText('รหัสผ่านใหม่ต้องไม่ซ้ำกับรหัสเดิม')).toBeDefined();
+
+    fireEvent.change(screen.getByLabelText('รหัสผ่านใหม่'), { target: { value: 'MyOwnPass9' } });
+    fireEvent.change(screen.getByLabelText('พิมพ์รหัสผ่านใหม่อีกครั้ง'), { target: { value: 'MyOwnPass9' } });
+    await user.click(screen.getByRole('button', { name: 'บันทึก' }));
+    expect(await screen.findByRole('navigation', { name: 'เมนูหลัก' }, { timeout: 5000 })).toBeDefined();
+
+    // รหัสที่ผู้ดูแลตั้งให้ใช้ไม่ได้แล้ว ใช้รหัสที่ตั้งเองได้ และไม่ถูกบังคับซ้ำ
+    await signOutVia(user);
+    await enterPassword('teacher', 'NewTeach88');
+    expect(await screen.findByText('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง', {}, { timeout: 3000 })).toBeDefined();
+    await signInAs('teacher', 'MyOwnPass9');
+  }, 40_000);
+
+  it('ผู้ใช้งานทั่วไปเห็นหน้าของฉัน: ข้อมูลตัวเอง คำขอ และเปลี่ยน PIN ได้เอง', async () => {
+    const { user } = await openApp('teacher');
+    expect(await screen.findByRole('heading', { level: 1, name: 'ครูทดลอง ใจดี' }, { timeout: 5000 })).toBeDefined();
+    expect(screen.getByRole('heading', { name: 'คำขอของฉัน' })).toBeDefined();
+    expect(within(screen.getByRole('navigation', { name: 'ทางลัด' })).getByRole('link', { name: /จองห้องประชุม/ })).toBeDefined();
+
+    // ใส่เบอร์ของตัวเอง แล้วฟอร์มจองเติมให้เอง
+    await user.click(screen.getByRole('button', { name: /ใส่เบอร์|แก้ไข/ }));
+    fireEvent.change(screen.getByLabelText('เบอร์โทร'), { target: { value: '12' } });
+    await user.click(screen.getByRole('button', { name: 'บันทึก' }));
+    expect(await screen.findByText(/เบอร์โทรต้องเป็นตัวเลข 9–10 หลัก/)).toBeDefined();
+    fireEvent.change(screen.getByLabelText('เบอร์โทร'), { target: { value: '081-555-0101' } });
+    await user.click(screen.getByRole('button', { name: 'บันทึก' }));
+    expect(await screen.findByText('081-555-0101')).toBeDefined();
+
+    // เปลี่ยน PIN: ใส่ PIN ปัจจุบันผิด → ไม่ผ่าน
+    await user.click(screen.getByRole('button', { name: /เปลี่ยน PIN/ }));
+    const dialog = await screen.findByRole('dialog', { name: 'เปลี่ยน PIN' });
+    fireEvent.change(within(dialog).getByLabelText('PIN ปัจจุบัน'), { target: { value: '999990' } });
+    fireEvent.change(within(dialog).getByLabelText('PIN ใหม่'), { target: { value: '582917' } });
+    fireEvent.change(within(dialog).getByLabelText('พิมพ์ PIN ใหม่อีกครั้ง'), { target: { value: '582917' } });
+    await user.click(within(dialog).getByRole('button', { name: 'บันทึก PIN ใหม่' }));
+    expect(await within(dialog).findAllByText('PIN ปัจจุบันไม่ถูกต้อง')).not.toHaveLength(0);
+    fireEvent.change(within(dialog).getByLabelText('PIN ปัจจุบัน'), { target: { value: PINS.teacher! } });
+    await user.click(within(dialog).getByRole('button', { name: 'บันทึก PIN ใหม่' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull(), { timeout: 5000 });
+
+    // PIN ใหม่ใช้เข้าได้ PIN เดิมไม่ได้
+    await signOutVia(user);
+    await enterPinOnly(PINS.teacher!);
+    expect(await screen.findByText('PIN ไม่ถูกต้อง', {}, { timeout: 3000 })).toBeDefined();
+    fireEvent.change(screen.getByLabelText(/^PIN/), { target: { value: '582917' } });
+    expect(await screen.findByRole('navigation', { name: 'เมนูหลัก' }, { timeout: 5000 })).toBeDefined();
+
+    // จองห้อง: ใช้ข้อมูลจากบัญชี ไม่ต้องพิมพ์ชื่อหรือเบอร์
+    window.location.hash = '#/book';
+    expect(await screen.findByText('ข้อมูลจากบัญชีของคุณ', {}, { timeout: 5000 })).toBeDefined();
+    expect(screen.getByText('081-555-0101')).toBeDefined();
+    expect(screen.queryByLabelText('หมายเลขโทรศัพท์')).toBeNull();
+  }, 40_000);
 });
 
 describe('จองห้องจริงตั้งแต่ต้นจนจบ', () => {

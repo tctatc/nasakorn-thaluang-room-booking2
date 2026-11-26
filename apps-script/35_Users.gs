@@ -42,11 +42,12 @@ function createUser_(admin, raw) {
     const now = nowIso_();
     const row = Object.assign({
       username: input.username, displayName: input.displayName, department: input.department, position: input.position,
-      role: input.role, status: input.status, allowedRoomIds: Domain.writeList(input.allowedRoomIds),
+      phone: input.phone, role: input.role, status: input.status, allowedRoomIds: Domain.writeList(input.allowedRoomIds),
+      mustChangePassword: input.requireChange, mustChangePin: input.requireChange,
       tokenVersion: 1, lastLoginAt: '', createdAt: now, updatedAt: now,
     }, newPinCredential_(input.username, input.pin), newPasswordCredential_(input.username, input.password));
     appendObject_(Domain.SHEET_USERS, row);
-    audit_(admin.email, 'user.create', 'user', input.username, { role: input.role });
+    audit_(admin.email, 'user.create', 'user', input.username, { role: input.role, requireChange: input.requireChange });
     return { user: adminUserView_(row) };
   });
 }
@@ -64,7 +65,8 @@ function updateUser_(admin, raw) {
     if (problem !== null) throw appError_(ERROR_CODES.CONFLICT, problem);
 
     const patch = {
-      displayName: input.displayName, department: input.department, position: input.position, role: input.role, status: input.status,
+      displayName: input.displayName, department: input.department, position: input.position, phone: input.phone,
+      role: input.role, status: input.status,
       allowedRoomIds: Domain.writeList(input.allowedRoomIds), updatedAt: nowIso_(),
     };
     updateByKey_(Domain.SHEET_USERS, input.username, patch);
@@ -84,11 +86,11 @@ function resetUserPin_(admin, raw) {
     if (row === null) throw appError_(ERROR_CODES.NOT_FOUND, 'ไม่พบผู้ใช้');
     assertPinUnique_(input.pin, input.username);
     const patch = Object.assign(newPinCredential_(input.username, input.pin), {
-      tokenVersion: (Number(row.tokenVersion) || 1) + 1, updatedAt: nowIso_(),
+      mustChangePin: input.requireChange, tokenVersion: (Number(row.tokenVersion) || 1) + 1, updatedAt: nowIso_(),
     });
     updateByKey_(Domain.SHEET_USERS, input.username, patch);
     CacheService.getScriptCache().remove(pinFailureKey_(input.username));
-    audit_(admin.email, 'user.resetPin', 'user', input.username, {});
+    audit_(admin.email, 'user.resetPin', 'user', input.username, { requireChange: input.requireChange });
     return { ok: true };
   });
 }
@@ -102,10 +104,10 @@ function resetUserPassword_(admin, raw) {
     const row = findByKey_(Domain.SHEET_USERS, input.username);
     if (row === null) throw appError_(ERROR_CODES.NOT_FOUND, 'ไม่พบผู้ใช้');
     updateByKey_(Domain.SHEET_USERS, input.username, Object.assign(newPasswordCredential_(input.username, input.password), {
-      tokenVersion: (Number(row.tokenVersion) || 1) + 1, updatedAt: nowIso_(),
+      mustChangePassword: input.requireChange, tokenVersion: (Number(row.tokenVersion) || 1) + 1, updatedAt: nowIso_(),
     }));
     CacheService.getScriptCache().remove(pinFailureKey_(input.username));
-    audit_(admin.email, 'user.resetPassword', 'user', input.username, {});
+    audit_(admin.email, 'user.resetPassword', 'user', input.username, { requireChange: input.requireChange });
     return { ok: true };
   });
 }

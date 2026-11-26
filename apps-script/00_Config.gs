@@ -38,6 +38,8 @@ const ERROR_CODES = {
   VALIDATION: 'VALIDATION',
   BUSY: 'BUSY',
   NOT_CONFIGURED: 'NOT_CONFIGURED',
+  // ผู้ดูแลตั้งรหัสให้ เจ้าของบัญชียังไม่ได้ตั้งรหัสผ่าน/PIN ของตัวเอง (หน้าเว็บพาไปหน้าตั้งรหัสใหม่)
+  CHANGE_REQUIRED: 'CHANGE_REQUIRED',
   INTERNAL: 'INTERNAL',
 };
 

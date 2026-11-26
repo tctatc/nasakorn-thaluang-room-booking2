@@ -101,11 +101,12 @@ function apiHandlers_() {
     },
 
     // ต้องล็อกอิน
+    // บัญชีที่ต้องตั้งรหัสใหม่เรียกได้แค่ me / bootstrap / changeOwnCredentials (ที่เหลือ authenticate_ ปฏิเสธ)
     me: function (payload, token) {
-      return { user: authenticate_(token) };
+      return { user: authenticateAllowPending_(token) };
     },
     bootstrap: function (payload, token) {
-      const user = authenticate_(token);
+      const user = authenticateAllowPending_(token);
       return {
         user: user,
         settings: readSettings_(),
@@ -113,6 +114,8 @@ function apiHandlers_() {
         serverTime: nowIso_(),
       };
     },
+    changeOwnCredentials: function (payload, token) { return changeOwnCredentials_(authenticateAllowPending_(token), payload || {}); },
+    updateOwnProfile: function (payload, token) { return updateOwnProfile_(authenticate_(token), payload || {}); },
     // ไม่มี token = ผู้จองทั่วไป เห็นห้องทั้งหมด / มี token = ตรวจสิทธิ์ห้องรายบุคคลตามเดิม
     rooms: function (payload, token) { return token ? listRooms_(authenticate_(token)) : publicRooms_(); },
     bookings: function (payload, token) { return listBookings_(authenticate_(token), payload || {}); },

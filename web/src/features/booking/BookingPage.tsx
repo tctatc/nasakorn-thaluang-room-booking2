@@ -118,9 +118,13 @@ export function BookingPage() {
   // ช่องดักบอท — ซ่อนจากคนจริง ถ้ามีค่าเซิร์ฟเวอร์จะปฏิเสธ
   const [website, setWebsite] = useState('');
   // ข้อมูลผู้จองที่จำไว้ในเครื่องนี้ (ถ้ามี) — จองครั้งต่อไปไม่ต้องพิมพ์ซ้ำ
-  const [savedBooker] = useState(readBookerProfile);
+  // ผู้ที่เข้าสู่ระบบและผู้ดูแลกรอกเบอร์ไว้แล้ว ใช้ข้อมูลจากบัญชีแทน ไม่ต้องพิมพ์ตั้งแต่ครั้งแรก
+  const [fromAccount] = useState(() => readBookerProfile() === null && Boolean(user?.phone?.trim()));
+  const [savedBooker] = useState(() => readBookerProfile() ?? (fromAccount && user
+    ? { namePrefix: '', bookerName: user.displayName, position: user.position, department: user.department, phone: user.phone ?? '' }
+    : null));
   const [editingBooker, setEditingBooker] = useState(savedBooker === null);
-  const [rememberMe, setRememberMe] = useState(() => savedBooker !== null || rememberByDefault());
+  const [rememberMe, setRememberMe] = useState(() => (savedBooker !== null && !fromAccount) || rememberByDefault());
   const [extrasOpen, setExtrasOpen] = useState(false);
   const [namePrefix, setNamePrefix] = useState(savedBooker?.namePrefix ?? 'นาย');
   const [bookerName, setBookerName] = useState(savedBooker?.bookerName ?? '');
@@ -262,7 +266,9 @@ export function BookingPage() {
       // ไม่ได้เข้าสู่ระบบ = ผู้จองทั่วไป (กรอกชื่อ เบอร์ แผนก) ได้รหัสติดตามไว้ดูสถานะ
       const { trackingCode } = user ? await api.createBooking(token, request) : await api.guestBooking({ ...request, website });
       rememberTracking({ code: trackingCode, title, dateKey, startMin, endMin, roomId });
-      if (rememberMe) saveBookerProfile({ namePrefix, bookerName, position, department, phone });
+      // ใช้ข้อมูลจากบัญชีโดยไม่แก้ = ไม่ต้องจำในเครื่อง (ครั้งหน้าก็ดึงจากบัญชีอีก)
+      if (fromAccount && !editingBooker) { /* ไม่แตะข้อมูลที่จำไว้ */ }
+      else if (rememberMe) saveBookerProfile({ namePrefix, bookerName, position, department, phone });
       else forgetBookerProfile();
       nav(`/track/${trackingCode}`, { state: { justBooked: true } });
     } catch (e) {
@@ -454,7 +460,7 @@ export function BookingPage() {
             </div></>}
           </Section>
 
-          <Section step={3} title="ผู้จอง" hint={savedBooker && !editingBooker ? 'ใช้ข้อมูลที่จำไว้ในเครื่องนี้' : 'ชื่อและเบอร์ที่ผู้อนุมัติติดต่อกลับได้'} done={done.booker}>
+          <Section step={3} title="ผู้จอง" hint={savedBooker && !editingBooker ? (fromAccount ? 'ข้อมูลจากบัญชีของคุณ' : 'ใช้ข้อมูลที่จำไว้ในเครื่องนี้') : 'ชื่อและเบอร์ที่ผู้อนุมัติติดต่อกลับได้'} done={done.booker}>
             {savedBooker && !editingBooker ? (
               <div className="flex flex-wrap items-center gap-3 rounded-control bg-surface-sunken px-3.5 py-3 ring-1 ring-inset ring-line">
                 <span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-full bg-brand-soft text-brand">
@@ -469,7 +475,7 @@ export function BookingPage() {
                   <button type="button" onClick={() => setEditingBooker(true)} className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-control bg-surface px-3 text-sm font-medium text-brand ring-1 ring-inset ring-brand-border transition-colors duration-150 hover:bg-brand-soft sm:flex-none">
                     <Pencil className="size-4" aria-hidden="true" />แก้ไข
                   </button>
-                  <button
+                  {!fromAccount && <button
                     type="button"
                     onClick={() => {
                       forgetBookerProfile();
@@ -480,7 +486,7 @@ export function BookingPage() {
                     className="inline-flex min-h-11 flex-1 items-center justify-center rounded-control bg-surface px-3 text-sm font-medium text-ink-muted ring-1 ring-inset ring-line transition-colors duration-150 hover:text-ink sm:flex-none"
                   >
                     ไม่ใช่ฉัน
-                  </button>
+                  </button>}
                 </div>
               </div>
             ) : (

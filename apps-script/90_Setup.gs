@@ -51,6 +51,7 @@ function setupSystem() {
 
   // 3.2) รายการตั้งต้น: อุปกรณ์ ประเภทการประชุม แผนก ตำแหน่ง (เฉพาะชนิดที่ยังไม่มี)
   log.push(seedLookups());
+  log.push(addMissingDepartments_(true));
 
   // 4) ค่าตั้งค่าเริ่มต้น (เขียนเฉพาะตอนชีตว่าง จะไม่ทับค่าที่ผู้ดูแลแก้ไว้)
   const settingsSheet = getSheet_(Domain.SHEET_SETTINGS);
@@ -188,13 +189,7 @@ function migrateSheets() {
       return;
     }
 
-    // เพิ่มคอลัมน์ที่ขาดต่อท้าย ไม่แทรกกลาง เพื่อไม่ให้ข้อมูลเดิมเลื่อนคอลัมน์
-    const startColumn = header.filter(function (name) {
-      return String(name).trim() !== '';
-    }).length;
-    sheet.getRange(1, startColumn + 1, 1, missing.length).setValues([missing]);
-    sheet.getRange(1, 1, 1, startColumn + missing.length).setFontWeight('bold');
-    sheet.setFrozenRows(1);
+    appendMissingHeaders_(sheet, header, missing);
     log.push(`ชีต ${spec.name}: เพิ่มคอลัมน์ ${missing.join(', ')}`);
   });
 
@@ -255,7 +250,10 @@ function resetAdminAccess() {
     const password = randomPassword_();
     updateByKey_(Domain.SHEET_USERS, username, Object.assign(
       newPinCredential_(username, pin), newPasswordCredential_(username, password),
-      { role: 'admin', status: 'active', tokenVersion: (Number(row.tokenVersion) || 1) + 1, updatedAt: nowIso_() },
+      {
+        role: 'admin', status: 'active', mustChangePassword: false, mustChangePin: false,
+        tokenVersion: (Number(row.tokenVersion) || 1) + 1, updatedAt: nowIso_(),
+      },
     ));
     return { password: password, pin: pin };
   });

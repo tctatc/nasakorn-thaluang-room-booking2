@@ -101,3 +101,9 @@ export function formatRelativeToNow(target: Date, now: Date): string {
 export function formatNumber(value: number): string {
   return new Intl.NumberFormat('th-TH').format(value);
 }
+
+/** ตัวอักษรแรกของชื่อสำหรับวงกลมรูปโปรไฟล์ — ข้ามคำนำหน้า (นาย นางสาว ดร. ...) ให้เห็นอักษรของชื่อจริง */
+export function nameInitial(displayName: string): string {
+  const name = displayName.trim().replace(/^(นางสาว|นาง|นาย|ดร\.|ว่าที่\s*ร\.ต\.)\s*/, '');
+  return name.charAt(0) || displayName.trim().charAt(0) || '?';
+}

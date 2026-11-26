@@ -8,6 +8,7 @@ import {
   Settings2,
   Star,
   LayoutDashboard,
+  UserRound,
   UsersRound,
 } from 'lucide-react';
 import type { ComponentType } from 'react';
@@ -18,13 +19,17 @@ export interface NavItem {
   mobile?: 'bar';
   path: string;
   label: string;
+  /** ชื่อสั้นบนแถบเมนู — ไม่ระบุ = ใช้ชื่อสั้นตามเส้นทางในแถบนั้น */
+  shortLabel?: string;
   icon: ComponentType<{ className?: string }>;
   /** สิทธิ์ที่เห็นเมนูนี้ได้ ไม่ระบุ = ทุกคน */
   roles?: UserRole[];
 }
 
 export const NAV_ITEMS: NavItem[] = [
-  { path: '/', label: 'ภาพรวม', icon: LayoutDashboard, mobile: 'bar' },
+  // ผู้ใช้งานทั่วไป: หน้าแรกคือ "หน้าของฉัน" (โปรไฟล์ คำขอของฉัน บัญชี) / ผู้ลงนามและผู้ดูแล: ภาพรวมทั้งระบบ
+  { path: '/', label: 'หน้าของฉัน', shortLabel: 'หน้าแรก', icon: UserRound, mobile: 'bar', roles: ['staff'] },
+  { path: '/', label: 'ภาพรวม', icon: LayoutDashboard, mobile: 'bar', roles: ['admin', 'inspector', 'endorser', 'director'] },
   { path: '/book', label: 'จองห้องประชุม', icon: CalendarPlus, mobile: 'bar' },
   { path: '/calendar', label: 'ปฏิทินการจอง', icon: CalendarDays, mobile: 'bar' },
   { path: '/my-bookings', label: 'รายการจองของฉัน', icon: ClipboardList, mobile: 'bar' },

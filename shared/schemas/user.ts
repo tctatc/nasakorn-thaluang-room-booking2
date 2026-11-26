@@ -159,9 +159,23 @@ export interface UserAccountInput {
   department: string;
   /** ตำแหน่ง เช่น ครู หัวหน้าแผนกวิชา — เติมให้อัตโนมัติในแบบฟอร์มจอง */
   position: string;
+  /** เบอร์โทร — เติมให้อัตโนมัติในแบบฟอร์มจอง ผู้ใช้แก้เองได้ที่หน้าของฉัน */
+  phone: string;
   role: UserRole;
   status: UserStatus;
   allowedRoomIds: string[];
+  /** สร้างบัญชีแล้วให้เจ้าของตั้งรหัสผ่านและ PIN ใหม่เองตอนเข้าครั้งแรก (ผู้ดูแลจะไม่รู้รหัสจริงของเขา) */
+  requireChange: boolean;
+}
+
+/** เบอร์ที่ใช้ได้: ว่าง หรือมีตัวเลข 9–10 หลัก (ขีด/ช่องว่างไม่นับ) */
+function phoneField(check: Check, field: string, raw: unknown): string {
+  const phone = check.string(field, raw, { label: 'เบอร์โทร', max: 30, fallback: '' });
+  const digits = phone.replace(/\D/g, '');
+  if (phone !== '' && (digits.length < 9 || digits.length > 10 || /[^\d\s+()-]/.test(phone))) {
+    check.fail(field, 'เบอร์โทรต้องเป็นตัวเลข 9–10 หลัก เช่น 081-234-5678');
+  }
+  return phone;
 }
 
 function roomIdList(check: Check, raw: unknown): string[] {
@@ -197,15 +211,17 @@ export function validateUserAccountInput(
     displayName: check.string('displayName', input.displayName, { label: 'ชื่อ-นามสกุล', min: 1, max: 100 }),
     department: check.string('department', input.department, { label: 'หน่วยงาน', max: 100, fallback: '' }),
     position: check.string('position', input.position, { label: 'ตำแหน่ง', max: 100, fallback: '' }),
+    phone: phoneField(check, 'phone', input.phone),
     role: check.oneOf('role', input.role, USER_ROLES, { label: 'สิทธิ์การใช้งาน' }),
     status: check.oneOf('status', input.status, USER_STATUSES, { label: 'สถานะผู้ใช้', fallback: 'active' }),
     allowedRoomIds: roomIdList(check, input.allowedRoomIds),
+    requireChange: check.boolean('requireChange', input.requireChange, { label: 'ให้เปลี่ยนรหัสเอง', fallback: false }),
     pin,
     password,
   });
 }
 
-export function validateResetPinInput(raw: unknown): ValidationResult<{ username: string; pin: string }> {
+export function validateResetPinInput(raw: unknown): ValidationResult<{ username: string; pin: string; requireChange: boolean }> {
   const input = asRecord(raw);
   const check = new Check();
   const username = normalizeUsername(input.username);
@@ -213,10 +229,11 @@ export function validateResetPinInput(raw: unknown): ValidationResult<{ username
   const pin = typeof input.pin === 'string' ? input.pin.trim() : '';
   const problem = pinProblem(pin);
   if (problem !== null) check.fail('pin', problem);
-  return check.result({ username, pin });
+  const requireChange = check.boolean('requireChange', input.requireChange, { label: 'ให้เปลี่ยน PIN เอง', fallback: false });
+  return check.result({ username, pin, requireChange });
 }
 
-export function validateResetPasswordInput(raw: unknown): ValidationResult<{ username: string; password: string }> {
+export function validateResetPasswordInput(raw: unknown): ValidationResult<{ username: string; password: string; requireChange: boolean }> {
   const input = asRecord(raw);
   const check = new Check();
   const username = normalizeUsername(input.username);
@@ -224,7 +241,61 @@ export function validateResetPasswordInput(raw: unknown): ValidationResult<{ use
   const password = typeof input.password === 'string' ? input.password : '';
   const problem = passwordProblem(password);
   if (problem !== null) check.fail('password', problem);
-  return check.result({ username, password });
+  const requireChange = check.boolean('requireChange', input.requireChange, { label: 'ให้เปลี่ยนรหัสผ่านเอง', fallback: false });
+  return check.result({ username, password, requireChange });
+}
+
+/* ---------- ผู้ใช้จัดการบัญชีตัวเอง ---------- */
+
+export interface CredentialChangeInput {
+  currentPassword: string;
+  newPassword: string;
+  currentPin: string;
+  newPin: string;
+  changePassword: boolean;
+  changePin: boolean;
+}
+
+/**
+ * เปลี่ยนรหัสผ่านและ/หรือ PIN ของตัวเอง — ต้องใส่ค่าปัจจุบันของสิ่งที่จะเปลี่ยนเสมอ
+ * (session ที่ถูกขโมยไปจึงยึดบัญชีด้วยการตั้งรหัสใหม่ไม่ได้)
+ * `required` = สิ่งที่ผู้ดูแลบังคับให้เปลี่ยน (ตอนเข้าครั้งแรก) ต้องส่งมาด้วย
+ */
+export function validateCredentialChangeInput(
+  raw: unknown,
+  required: { password: boolean; pin: boolean },
+): ValidationResult<CredentialChangeInput> {
+  const input = asRecord(raw);
+  const check = new Check();
+  const text = (value: unknown) => (typeof value === 'string' ? value : '');
+  const currentPassword = text(input.currentPassword);
+  const newPassword = text(input.newPassword);
+  const currentPin = text(input.currentPin).trim();
+  const newPin = text(input.newPin).trim();
+  const changePassword = required.password || newPassword !== '';
+  const changePin = required.pin || newPin !== '';
+
+  if (!changePassword && !changePin) check.fail('newPassword', 'กรุณากรอกรหัสผ่านใหม่หรือ PIN ใหม่');
+  if (changePassword) {
+    if (currentPassword === '') check.fail('currentPassword', 'กรุณากรอกรหัสผ่านปัจจุบัน');
+    const problem = passwordProblem(newPassword);
+    if (problem !== null) check.fail('newPassword', problem);
+    else if (newPassword === currentPassword) check.fail('newPassword', 'รหัสผ่านใหม่ต้องไม่ซ้ำกับรหัสเดิม');
+  }
+  if (changePin) {
+    if (currentPin === '') check.fail('currentPin', 'กรุณากรอก PIN ปัจจุบัน');
+    const problem = pinProblem(newPin);
+    if (problem !== null) check.fail('newPin', problem);
+    else if (newPin === currentPin) check.fail('newPin', 'PIN ใหม่ต้องไม่ซ้ำกับ PIN เดิม');
+  }
+  return check.result({ currentPassword, newPassword, currentPin, newPin, changePassword, changePin });
+}
+
+/** ข้อมูลที่ผู้ใช้แก้เองได้ — ชื่อ สาขา ตำแหน่ง สิทธิ์ ให้ผู้ดูแลเป็นคนกำหนด */
+export function validateOwnProfileInput(raw: unknown): ValidationResult<{ phone: string }> {
+  const input = asRecord(raw);
+  const check = new Check();
+  return check.result({ phone: phoneField(check, 'phone', input.phone) });
 }
 
 /**

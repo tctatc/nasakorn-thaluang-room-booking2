@@ -62,7 +62,7 @@ export function BottomNav({
                   >
                     <item.icon className="size-6" />
                   </span>
-                  {SHORT_LABEL[item.path] ?? item.label}
+                  {item.shortLabel ?? SHORT_LABEL[item.path] ?? item.label}
                 </NavLink>
               ) : (
                 <NavLink
@@ -86,7 +86,7 @@ export function BottomNav({
                       >
                         <item.icon className="size-5" />
                       </span>
-                      {SHORT_LABEL[item.path] ?? item.label}
+                      {item.shortLabel ?? SHORT_LABEL[item.path] ?? item.label}
                     </>
                   )}
                 </NavLink>

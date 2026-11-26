@@ -48,10 +48,16 @@ function readHeader_(name) {
   if (headerCache_[name] !== undefined) return headerCache_[name];
 
   const sheet = getSheet_(name);
-  const width = Math.max(sheet.getLastColumn(), 1);
-  const header = sheet.getRange(1, 1, 1, width).getValues()[0];
   const spec = Domain.sheetSpec(name);
-  const missing = Domain.missingColumns(header, spec.headers);
+  let header = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
+  let missing = Domain.missingColumns(header, spec.headers);
+  if (missing.length > 0) {
+    // รุ่นใหม่เพิ่มคอลัมน์ไว้ท้ายตารางเสมอ เติมหัวคอลัมน์ให้เองตอนอ่านครั้งแรก ไม่ต้องรอผู้ดูแลรัน migrateSheets()
+    // ระบบยังใช้งานได้ต่อทันทีหลังอัปเดตโค้ด (ข้อมูลเดิมไม่ขยับ เพราะเติมต่อท้ายเท่านั้น)
+    appendMissingHeaders_(sheet, header, missing);
+    header = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
+    missing = Domain.missingColumns(header, spec.headers);
+  }
   if (missing.length > 0) {
     throw appError_(
       ERROR_CODES.NOT_CONFIGURED,
@@ -64,6 +70,14 @@ function readHeader_(name) {
     headerMap: Domain.buildHeaderMap(header),
   };
   return headerCache_[name];
+}
+
+/** เพิ่มคอลัมน์ที่ขาดต่อท้ายคอลัมน์สุดท้ายที่มีชื่อ — ไม่แทรกกลาง ข้อมูลเดิมจึงไม่เลื่อน */
+function appendMissingHeaders_(sheet, header, missing) {
+  const startColumn = header.filter(function (name) { return String(name).trim() !== ''; }).length;
+  sheet.getRange(1, startColumn + 1, 1, missing.length).setValues([missing]);
+  sheet.getRange(1, 1, 1, startColumn + missing.length).setFontWeight('bold');
+  sheet.setFrozenRows(1);
 }
 
 /** ล้าง cache — เรียกเมื่อโครงสร้างชีตเปลี่ยน (migrateSheets) */

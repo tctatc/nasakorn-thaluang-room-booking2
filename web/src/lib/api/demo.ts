@@ -41,6 +41,7 @@ import {
   COLLEGE_ACCOUNTS, PIN_LOCK_MINUTES, PIN_MAX_FAILURES, canUseRoom, constantTimeEqual, lastAdminProblem,
   PIN_LOGIN_FAILURE_LIMIT_PER_HOUR, PIN_TAKEN_MESSAGE, normalizeUsername, passwordDigestMessage, pinDigestMessage,
   validateLoginInput, validatePinLoginInput, validateResetPasswordInput, validateResetPinInput, validateUserAccountInput,
+  validateCredentialChangeInput, validateOwnProfileInput,
 } from '@shared/schemas/user';
 
 export interface DemoRoom {
@@ -174,7 +175,10 @@ async function seedUsers(): Promise<DemoUser[]> {
 
 function sessionView(user: DemoUser): SessionUser {
   const { email, displayName, department, role, status, allowedRoomIds } = user;
-  return { email, displayName, department, position: user.position ?? '', role, status, allowedRoomIds: [...allowedRoomIds] };
+  return {
+    email, displayName, department, position: user.position ?? '', role, status, allowedRoomIds: [...allowedRoomIds],
+    phone: user.phone ?? '', mustChangePassword: user.mustChangePassword === true, mustChangePin: user.mustChangePin === true,
+  };
 }
 
 function adminView(user: DemoUser): AdminUser {
@@ -444,7 +448,7 @@ export function createDemoTransport(): Transport {
   }
 
   // token ผูก tokenVersion ไว้ รีเซ็ต PIN แล้ว token เดิมใช้ไม่ได้ทันทีเหมือนระบบจริง
-  function userFromToken(token: string): DemoUser {
+  function userFromToken(token: string, allowPending = false): DemoUser {
     if (!token.startsWith(DEMO_TOKEN_PREFIX)) {
       throw new ApiError('UNAUTHENTICATED', 'กรุณาเข้าสู่ระบบ');
     }
@@ -453,6 +457,10 @@ export function createDemoTransport(): Transport {
     if (user === undefined) throw new ApiError('FORBIDDEN', 'ไม่พบบัญชีผู้ใช้นี้ในระบบแล้ว');
     if (user.status !== 'active') throw new ApiError('FORBIDDEN', 'บัญชีนี้ถูกปิดการใช้งาน');
     if (String(user.tokenVersion) !== version) throw new ApiError('UNAUTHENTICATED', 'PIN ของคุณถูกเปลี่ยน กรุณาเข้าสู่ระบบอีกครั้ง');
+    // เหมือน authenticate_ ฝั่ง Apps Script: ยังไม่ตั้งรหัสเองก็ทำอะไรไม่ได้ ยกเว้นคำสั่งที่ขอผ่านโดยตรง
+    if (!allowPending && (user.mustChangePassword === true || user.mustChangePin === true)) {
+      throw new ApiError('CHANGE_REQUIRED', 'กรุณาตั้งรหัสผ่านและ PIN ของคุณเองก่อนใช้งาน');
+    }
     return user;
   }
 
@@ -593,7 +601,8 @@ export function createDemoTransport(): Transport {
       if (await findByPin(input.pin)) throw new ApiError('CONFLICT', PIN_TAKEN_MESSAGE);
       const user: DemoUser = {
         email: input.username, displayName: input.displayName, department: input.department, position: input.position, role: input.role,
-        status: input.status, allowedRoomIds: input.allowedRoomIds, tokenVersion: 1, lastLoginAt: '',
+        status: input.status, allowedRoomIds: input.allowedRoomIds, tokenVersion: 1, lastLoginAt: '', phone: input.phone,
+        mustChangePassword: input.requireChange, mustChangePin: input.requireChange,
         createdAt: new Date().toISOString(), ...(await demoCredential(input.username, input.pin)),
         ...(await demoPasswordCredential(input.username, input.password)),
       };
@@ -614,7 +623,7 @@ export function createDemoTransport(): Transport {
       if (problem !== null) throw new ApiError('CONFLICT', problem);
       Object.assign(user, {
         displayName: input.displayName, department: input.department, position: input.position, role: input.role,
-        status: input.status, allowedRoomIds: input.allowedRoomIds,
+        status: input.status, allowedRoomIds: input.allowedRoomIds, phone: input.phone,
       });
       changed();
       return { user: adminView(user) };
@@ -626,7 +635,7 @@ export function createDemoTransport(): Transport {
       const user = state.users.find((item) => item.email === parsed.value.username);
       if (!user) throw new ApiError('NOT_FOUND', 'ไม่พบผู้ใช้');
       if (await findByPin(parsed.value.pin, user.email)) throw new ApiError('CONFLICT', PIN_TAKEN_MESSAGE);
-      Object.assign(user, await demoCredential(user.email, parsed.value.pin));
+      Object.assign(user, await demoCredential(user.email, parsed.value.pin), { mustChangePin: parsed.value.requireChange });
       user.tokenVersion += 1;
       failures.delete(user.email);
       changed();
@@ -638,7 +647,7 @@ export function createDemoTransport(): Transport {
       if (!parsed.ok) throw new ApiError('VALIDATION', issues(parsed), parsed.issues);
       const user = state.users.find((item) => item.email === parsed.value.username);
       if (!user) throw new ApiError('NOT_FOUND', 'ไม่พบผู้ใช้');
-      Object.assign(user, await demoPasswordCredential(user.email, parsed.value.password));
+      Object.assign(user, await demoPasswordCredential(user.email, parsed.value.password), { mustChangePassword: parsed.value.requireChange });
       user.tokenVersion += 1;
       failures.delete(user.email);
       changed();
@@ -656,10 +665,45 @@ export function createDemoTransport(): Transport {
       return { ok: true };
     },
 
-    me: (_payload, token) => ({ user: sessionView(userFromToken(token)) }),
+    me: (_payload, token) => ({ user: sessionView(userFromToken(token, true)) }),
+
+    changeOwnCredentials: async (payload: unknown, token) => {
+      const user = userFromToken(token, true);
+      assertNotLocked(user.email);
+      const parsed = validateCredentialChangeInput(payload, { password: user.mustChangePassword === true, pin: user.mustChangePin === true });
+      if (!parsed.ok) throw new ApiError('VALIDATION', issues(parsed), parsed.issues);
+      const input = parsed.value;
+      if (input.changePassword && !constantTimeEqual(await demoPasswordHash(user.email, user.passwordSalt, input.currentPassword), user.passwordHash)) {
+        recordFailure(user.email);
+        throw new ApiError('VALIDATION', 'รหัสผ่านปัจจุบันไม่ถูกต้อง', [{ field: 'currentPassword', message: 'รหัสผ่านปัจจุบันไม่ถูกต้อง' }]);
+      }
+      if (input.changePin && !(await pinMatches(user, input.currentPin))) {
+        recordFailure(user.email);
+        throw new ApiError('VALIDATION', 'PIN ปัจจุบันไม่ถูกต้อง', [{ field: 'currentPin', message: 'PIN ปัจจุบันไม่ถูกต้อง' }]);
+      }
+      // บอกว่า PIN มีคนใช้ = บอกใบ้ PIN ของคนอื่น จึงนับเป็นการใส่ผิด (5 ครั้งล็อกบัญชี) เหมือนฝั่ง Apps Script
+      if (input.changePin && await findByPin(input.newPin, user.email)) {
+        recordFailure(user.email);
+        throw new ApiError('CONFLICT', PIN_TAKEN_MESSAGE, [{ field: 'newPin', message: PIN_TAKEN_MESSAGE }]);
+      }
+      if (input.changePassword) Object.assign(user, await demoPasswordCredential(user.email, input.newPassword), { mustChangePassword: false });
+      if (input.changePin) Object.assign(user, await demoCredential(user.email, input.newPin), { mustChangePin: false });
+      user.tokenVersion += 1;
+      changed();
+      return issueSession(user);
+    },
+
+    updateOwnProfile: (payload: unknown, token) => {
+      const user = userFromToken(token);
+      const parsed = validateOwnProfileInput(payload);
+      if (!parsed.ok) throw new ApiError('VALIDATION', issues(parsed), parsed.issues);
+      user.phone = parsed.value.phone;
+      changed();
+      return { user: sessionView(user) };
+    },
 
     bootstrap: (_payload, token) => ({
-      user: sessionView(userFromToken(token)),
+      user: sessionView(userFromToken(token, true)),
       settings: state.settings,
       dataVersion: state.dataVersion,
       serverTime: new Date().toISOString(),

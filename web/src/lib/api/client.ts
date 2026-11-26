@@ -109,9 +109,21 @@ export interface ApiClient {
   users(token: string): Promise<{ users: AdminUser[] }>;
   createUser(token: string, input: UserAccountInput & { pin: string; password: string }): Promise<{ user: AdminUser }>;
   updateUser(token: string, input: UserAccountInput): Promise<{ user: AdminUser }>;
-  resetUserPin(token: string, username: string, pin: string): Promise<{ ok: boolean }>;
-  resetUserPassword(token: string, username: string, password: string): Promise<{ ok: boolean }>;
+  /** requireChange = ให้เจ้าของบัญชีตั้งค่าใหม่เองตอนเข้าครั้งถัดไป */
+  resetUserPin(token: string, username: string, pin: string, requireChange?: boolean): Promise<{ ok: boolean }>;
+  resetUserPassword(token: string, username: string, password: string, requireChange?: boolean): Promise<{ ok: boolean }>;
   deleteUser(token: string, username: string): Promise<{ ok: boolean }>;
+  /** บัญชีของตัวเอง — สำเร็จแล้วได้ session ใหม่ (session เก่าทุกเครื่องหลุด) */
+  changeOwnCredentials(token: string, input: OwnCredentialInput): Promise<LoginResult>;
+  updateOwnProfile(token: string, input: { phone: string }): Promise<{ user: SessionUser }>;
+}
+
+/** ช่องที่ไม่เปลี่ยนส่งเป็นสตริงว่าง */
+export interface OwnCredentialInput {
+  currentPassword: string;
+  newPassword: string;
+  currentPin: string;
+  newPin: string;
 }
 
 /** ช่องที่ผู้ดูแลแก้ได้ (ADMIN_EDITABLE_FIELDS) — ช่องที่ไม่ส่งใช้ค่าเดิม */
@@ -161,9 +173,11 @@ function wrap(transport: Transport): ApiClient {
     users: (token) => transport.call('users', {}, token),
     createUser: (token, input) => transport.call('createUser', input, token),
     updateUser: (token, input) => transport.call('updateUser', input, token),
-    resetUserPin: (token, username, pin) => transport.call('resetUserPin', { username, pin }, token),
-    resetUserPassword: (token, username, password) => transport.call('resetUserPassword', { username, password }, token),
+    resetUserPin: (token, username, pin, requireChange = false) => transport.call('resetUserPin', { username, pin, requireChange }, token),
+    resetUserPassword: (token, username, password, requireChange = false) => transport.call('resetUserPassword', { username, password, requireChange }, token),
     deleteUser: (token, username) => transport.call('deleteUser', { username }, token),
+    changeOwnCredentials: (token, input) => transport.call('changeOwnCredentials', input, token),
+    updateOwnProfile: (token, input) => transport.call('updateOwnProfile', input, token),
   };
 }
 

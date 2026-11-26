@@ -162,6 +162,7 @@ var Domain = (() => {
     mergeAdminEdit: () => mergeAdminEdit,
     mergeIntervals: () => mergeIntervals,
     missingColumns: () => missingColumns,
+    missingDefaultLookups: () => missingDefaultLookups,
     monthsBetween: () => monthsBetween,
     newLookupKey: () => newLookupKey,
     normalizeDateKey: () => normalizeDateKey,
@@ -216,9 +217,11 @@ var Domain = (() => {
     validateBookingRequest: () => validateBookingRequest,
     validateBookingRules: () => validateBookingRules,
     validateCancelBookingInput: () => validateCancelBookingInput,
+    validateCredentialChangeInput: () => validateCredentialChangeInput,
     validateDecideBookingInput: () => validateDecideBookingInput,
     validateLoginInput: () => validateLoginInput,
     validateLookupInput: () => validateLookupInput,
+    validateOwnProfileInput: () => validateOwnProfileInput,
     validatePinLoginInput: () => validatePinLoginInput,
     validateResetPasswordInput: () => validateResetPasswordInput,
     validateResetPinInput: () => validateResetPinInput,
@@ -605,7 +608,11 @@ var Domain = (() => {
         "lastLoginAt",
         "createdAt",
         "updatedAt",
-        "position"
+        "position",
+        "phone",
+        // TRUE = ผู้ดูแลตั้งรหัสให้ เจ้าของบัญชีต้องตั้งใหม่เองก่อนใช้งานอื่น (server บังคับใน authenticate_)
+        "mustChangePassword",
+        "mustChangePin"
       ]
     },
     {
@@ -925,6 +932,14 @@ var Domain = (() => {
   }
   var PIN_LOGIN_FAILURE_LIMIT_PER_HOUR = 30;
   var PIN_TAKEN_MESSAGE = "PIN \u0E19\u0E35\u0E49\u0E21\u0E35\u0E04\u0E19\u0E43\u0E0A\u0E49\u0E41\u0E25\u0E49\u0E27 \u0E01\u0E23\u0E38\u0E13\u0E32\u0E43\u0E0A\u0E49 PIN \u0E2D\u0E37\u0E48\u0E19 (PIN \u0E15\u0E49\u0E2D\u0E07\u0E44\u0E21\u0E48\u0E0B\u0E49\u0E33\u0E01\u0E31\u0E19 \u0E40\u0E1E\u0E23\u0E32\u0E30\u0E43\u0E0A\u0E49\u0E40\u0E02\u0E49\u0E32\u0E23\u0E30\u0E1A\u0E1A\u0E44\u0E14\u0E49\u0E42\u0E14\u0E22\u0E44\u0E21\u0E48\u0E15\u0E49\u0E2D\u0E07\u0E43\u0E2A\u0E48\u0E0A\u0E37\u0E48\u0E2D)";
+  function phoneField(check, field, raw) {
+    const phone = check.string(field, raw, { label: "\u0E40\u0E1A\u0E2D\u0E23\u0E4C\u0E42\u0E17\u0E23", max: 30, fallback: "" });
+    const digits = phone.replace(/\D/g, "");
+    if (phone !== "" && (digits.length < 9 || digits.length > 10 || /[^\d\s+()-]/.test(phone))) {
+      check.fail(field, "\u0E40\u0E1A\u0E2D\u0E23\u0E4C\u0E42\u0E17\u0E23\u0E15\u0E49\u0E2D\u0E07\u0E40\u0E1B\u0E47\u0E19\u0E15\u0E31\u0E27\u0E40\u0E25\u0E02 9\u201310 \u0E2B\u0E25\u0E31\u0E01 \u0E40\u0E0A\u0E48\u0E19 081-234-5678");
+    }
+    return phone;
+  }
   function roomIdList(check, raw) {
     if (raw === void 0 || raw === null) return [];
     if (!Array.isArray(raw) || raw.some((item) => typeof item !== "string" || item.trim() === "" || item.includes(",") || item.length > 60)) {
@@ -953,9 +968,11 @@ var Domain = (() => {
       displayName: check.string("displayName", input.displayName, { label: "\u0E0A\u0E37\u0E48\u0E2D-\u0E19\u0E32\u0E21\u0E2A\u0E01\u0E38\u0E25", min: 1, max: 100 }),
       department: check.string("department", input.department, { label: "\u0E2B\u0E19\u0E48\u0E27\u0E22\u0E07\u0E32\u0E19", max: 100, fallback: "" }),
       position: check.string("position", input.position, { label: "\u0E15\u0E33\u0E41\u0E2B\u0E19\u0E48\u0E07", max: 100, fallback: "" }),
+      phone: phoneField(check, "phone", input.phone),
       role: check.oneOf("role", input.role, USER_ROLES, { label: "\u0E2A\u0E34\u0E17\u0E18\u0E34\u0E4C\u0E01\u0E32\u0E23\u0E43\u0E0A\u0E49\u0E07\u0E32\u0E19" }),
       status: check.oneOf("status", input.status, USER_STATUSES, { label: "\u0E2A\u0E16\u0E32\u0E19\u0E30\u0E1C\u0E39\u0E49\u0E43\u0E0A\u0E49", fallback: "active" }),
       allowedRoomIds: roomIdList(check, input.allowedRoomIds),
+      requireChange: check.boolean("requireChange", input.requireChange, { label: "\u0E43\u0E2B\u0E49\u0E40\u0E1B\u0E25\u0E35\u0E48\u0E22\u0E19\u0E23\u0E2B\u0E31\u0E2A\u0E40\u0E2D\u0E07", fallback: false }),
       pin,
       password
     });
@@ -968,7 +985,8 @@ var Domain = (() => {
     const pin = typeof input.pin === "string" ? input.pin.trim() : "";
     const problem = pinProblem(pin);
     if (problem !== null) check.fail("pin", problem);
-    return check.result({ username, pin });
+    const requireChange = check.boolean("requireChange", input.requireChange, { label: "\u0E43\u0E2B\u0E49\u0E40\u0E1B\u0E25\u0E35\u0E48\u0E22\u0E19 PIN \u0E40\u0E2D\u0E07", fallback: false });
+    return check.result({ username, pin, requireChange });
   }
   function validateResetPasswordInput(raw) {
     const input = asRecord(raw);
@@ -978,7 +996,38 @@ var Domain = (() => {
     const password = typeof input.password === "string" ? input.password : "";
     const problem = passwordProblem(password);
     if (problem !== null) check.fail("password", problem);
-    return check.result({ username, password });
+    const requireChange = check.boolean("requireChange", input.requireChange, { label: "\u0E43\u0E2B\u0E49\u0E40\u0E1B\u0E25\u0E35\u0E48\u0E22\u0E19\u0E23\u0E2B\u0E31\u0E2A\u0E1C\u0E48\u0E32\u0E19\u0E40\u0E2D\u0E07", fallback: false });
+    return check.result({ username, password, requireChange });
+  }
+  function validateCredentialChangeInput(raw, required) {
+    const input = asRecord(raw);
+    const check = new Check();
+    const text = (value) => typeof value === "string" ? value : "";
+    const currentPassword = text(input.currentPassword);
+    const newPassword = text(input.newPassword);
+    const currentPin = text(input.currentPin).trim();
+    const newPin = text(input.newPin).trim();
+    const changePassword = required.password || newPassword !== "";
+    const changePin = required.pin || newPin !== "";
+    if (!changePassword && !changePin) check.fail("newPassword", "\u0E01\u0E23\u0E38\u0E13\u0E32\u0E01\u0E23\u0E2D\u0E01\u0E23\u0E2B\u0E31\u0E2A\u0E1C\u0E48\u0E32\u0E19\u0E43\u0E2B\u0E21\u0E48\u0E2B\u0E23\u0E37\u0E2D PIN \u0E43\u0E2B\u0E21\u0E48");
+    if (changePassword) {
+      if (currentPassword === "") check.fail("currentPassword", "\u0E01\u0E23\u0E38\u0E13\u0E32\u0E01\u0E23\u0E2D\u0E01\u0E23\u0E2B\u0E31\u0E2A\u0E1C\u0E48\u0E32\u0E19\u0E1B\u0E31\u0E08\u0E08\u0E38\u0E1A\u0E31\u0E19");
+      const problem = passwordProblem(newPassword);
+      if (problem !== null) check.fail("newPassword", problem);
+      else if (newPassword === currentPassword) check.fail("newPassword", "\u0E23\u0E2B\u0E31\u0E2A\u0E1C\u0E48\u0E32\u0E19\u0E43\u0E2B\u0E21\u0E48\u0E15\u0E49\u0E2D\u0E07\u0E44\u0E21\u0E48\u0E0B\u0E49\u0E33\u0E01\u0E31\u0E1A\u0E23\u0E2B\u0E31\u0E2A\u0E40\u0E14\u0E34\u0E21");
+    }
+    if (changePin) {
+      if (currentPin === "") check.fail("currentPin", "\u0E01\u0E23\u0E38\u0E13\u0E32\u0E01\u0E23\u0E2D\u0E01 PIN \u0E1B\u0E31\u0E08\u0E08\u0E38\u0E1A\u0E31\u0E19");
+      const problem = pinProblem(newPin);
+      if (problem !== null) check.fail("newPin", problem);
+      else if (newPin === currentPin) check.fail("newPin", "PIN \u0E43\u0E2B\u0E21\u0E48\u0E15\u0E49\u0E2D\u0E07\u0E44\u0E21\u0E48\u0E0B\u0E49\u0E33\u0E01\u0E31\u0E1A PIN \u0E40\u0E14\u0E34\u0E21");
+    }
+    return check.result({ currentPassword, newPassword, currentPin, newPin, changePassword, changePin });
+  }
+  function validateOwnProfileInput(raw) {
+    const input = asRecord(raw);
+    const check = new Check();
+    return check.result({ phone: phoneField(check, "phone", input.phone) });
   }
   function lastAdminProblem(users, username, next) {
     const remaining = users.filter((user) => {
@@ -1863,18 +1912,37 @@ var Domain = (() => {
       ["exam", "\u0E2A\u0E2D\u0E1A / \u0E17\u0E14\u0E2A\u0E2D\u0E1A"],
       ["other", "\u0E2D\u0E37\u0E48\u0E19 \u0E46"]
     ],
+    /*
+     * แผนกวิชาตามสาขาที่เปิดสอนในประกาศรับสมัคร ปีการศึกษา 2570 (ตรงกับระบบรับสมัครและระบบทะเบียน)
+     * รวม ปวช./ปวส. และทวิภาคีของสาขาเดียวกันไว้แผนกเดียว ตามด้วยฝ่าย/งานที่จองห้องบ่อย
+     * รหัสเดิม (acc, auto, ...) คงไว้ การจองเก่าจึงยังอ้างถึงได้
+     */
     department: [
-      ["acc", "\u0E41\u0E1C\u0E19\u0E01\u0E27\u0E34\u0E0A\u0E32\u0E01\u0E32\u0E23\u0E1A\u0E31\u0E0D\u0E0A\u0E35"],
-      ["dbt", "\u0E41\u0E1C\u0E19\u0E01\u0E27\u0E34\u0E0A\u0E32\u0E40\u0E17\u0E04\u0E42\u0E19\u0E42\u0E25\u0E22\u0E35\u0E18\u0E38\u0E23\u0E01\u0E34\u0E08\u0E14\u0E34\u0E08\u0E34\u0E17\u0E31\u0E25"],
-      ["mkt", "\u0E41\u0E1C\u0E19\u0E01\u0E27\u0E34\u0E0A\u0E32\u0E01\u0E32\u0E23\u0E15\u0E25\u0E32\u0E14"],
+      // ประเภทวิชาอุตสาหกรรม
       ["auto", "\u0E41\u0E1C\u0E19\u0E01\u0E27\u0E34\u0E0A\u0E32\u0E0A\u0E48\u0E32\u0E07\u0E22\u0E19\u0E15\u0E4C"],
+      ["ev", "\u0E41\u0E1C\u0E19\u0E01\u0E27\u0E34\u0E0A\u0E32\u0E22\u0E32\u0E19\u0E22\u0E19\u0E15\u0E4C\u0E44\u0E1F\u0E1F\u0E49\u0E32"],
+      ["mech", "\u0E41\u0E1C\u0E19\u0E01\u0E27\u0E34\u0E0A\u0E32\u0E0A\u0E48\u0E32\u0E07\u0E01\u0E25\u0E42\u0E23\u0E07\u0E07\u0E32\u0E19"],
+      ["maint", "\u0E41\u0E1C\u0E19\u0E01\u0E27\u0E34\u0E0A\u0E32\u0E0A\u0E48\u0E32\u0E07\u0E0B\u0E48\u0E2D\u0E21\u0E1A\u0E33\u0E23\u0E38\u0E07"],
+      ["weld", "\u0E41\u0E1C\u0E19\u0E01\u0E27\u0E34\u0E0A\u0E32\u0E0A\u0E48\u0E32\u0E07\u0E40\u0E0A\u0E37\u0E48\u0E2D\u0E21\u0E42\u0E25\u0E2B\u0E30"],
       ["elec", "\u0E41\u0E1C\u0E19\u0E01\u0E27\u0E34\u0E0A\u0E32\u0E0A\u0E48\u0E32\u0E07\u0E44\u0E1F\u0E1F\u0E49\u0E32\u0E01\u0E33\u0E25\u0E31\u0E07"],
       ["etro", "\u0E41\u0E1C\u0E19\u0E01\u0E27\u0E34\u0E0A\u0E32\u0E0A\u0E48\u0E32\u0E07\u0E2D\u0E34\u0E40\u0E25\u0E47\u0E01\u0E17\u0E23\u0E2D\u0E19\u0E34\u0E01\u0E2A\u0E4C"],
-      ["mech", "\u0E41\u0E1C\u0E19\u0E01\u0E27\u0E34\u0E0A\u0E32\u0E0A\u0E48\u0E32\u0E07\u0E01\u0E25\u0E42\u0E23\u0E07\u0E07\u0E32\u0E19"],
-      ["weld", "\u0E41\u0E1C\u0E19\u0E01\u0E27\u0E34\u0E0A\u0E32\u0E0A\u0E48\u0E32\u0E07\u0E40\u0E0A\u0E37\u0E48\u0E2D\u0E21\u0E42\u0E25\u0E2B\u0E30"],
+      ["mecha", "\u0E41\u0E1C\u0E19\u0E01\u0E27\u0E34\u0E0A\u0E32\u0E40\u0E21\u0E04\u0E04\u0E32\u0E17\u0E23\u0E2D\u0E19\u0E34\u0E01\u0E2A\u0E4C\u0E41\u0E25\u0E30\u0E2B\u0E38\u0E48\u0E19\u0E22\u0E19\u0E15\u0E4C"],
+      ["indtech", "\u0E41\u0E1C\u0E19\u0E01\u0E27\u0E34\u0E0A\u0E32\u0E40\u0E17\u0E04\u0E19\u0E34\u0E04\u0E2D\u0E38\u0E15\u0E2A\u0E32\u0E2B\u0E01\u0E23\u0E23\u0E21"],
+      // ประเภทวิชาอุตสาหกรรมดิจิทัลและเทคโนโลยีสารสนเทศ
+      ["comp", "\u0E41\u0E1C\u0E19\u0E01\u0E27\u0E34\u0E0A\u0E32\u0E40\u0E17\u0E04\u0E42\u0E19\u0E42\u0E25\u0E22\u0E35\u0E04\u0E2D\u0E21\u0E1E\u0E34\u0E27\u0E40\u0E15\u0E2D\u0E23\u0E4C"],
+      ["dbt", "\u0E41\u0E1C\u0E19\u0E01\u0E27\u0E34\u0E0A\u0E32\u0E40\u0E17\u0E04\u0E42\u0E19\u0E42\u0E25\u0E22\u0E35\u0E18\u0E38\u0E23\u0E01\u0E34\u0E08\u0E14\u0E34\u0E08\u0E34\u0E17\u0E31\u0E25"],
+      ["it", "\u0E41\u0E1C\u0E19\u0E01\u0E27\u0E34\u0E0A\u0E32\u0E40\u0E17\u0E04\u0E42\u0E19\u0E42\u0E25\u0E22\u0E35\u0E2A\u0E32\u0E23\u0E2A\u0E19\u0E40\u0E17\u0E28"],
+      // ประเภทวิชาพาณิชยกรรม
+      ["acc", "\u0E41\u0E1C\u0E19\u0E01\u0E27\u0E34\u0E0A\u0E32\u0E01\u0E32\u0E23\u0E1A\u0E31\u0E0D\u0E0A\u0E35"],
+      ["mkt", "\u0E41\u0E1C\u0E19\u0E01\u0E27\u0E34\u0E0A\u0E32\u0E01\u0E32\u0E23\u0E15\u0E25\u0E32\u0E14"],
+      // วิชาพื้นฐาน
       ["gen", "\u0E41\u0E1C\u0E19\u0E01\u0E27\u0E34\u0E0A\u0E32\u0E2A\u0E32\u0E21\u0E31\u0E0D\u0E2A\u0E31\u0E21\u0E1E\u0E31\u0E19\u0E18\u0E4C"],
-      ["digital", "\u0E07\u0E32\u0E19\u0E28\u0E39\u0E19\u0E22\u0E4C\u0E14\u0E34\u0E08\u0E34\u0E17\u0E31\u0E25\u0E41\u0E25\u0E30\u0E2A\u0E37\u0E48\u0E2D\u0E2A\u0E32\u0E23\u0E2D\u0E07\u0E04\u0E4C\u0E01\u0E23"],
-      ["plan", "\u0E1D\u0E48\u0E32\u0E22\u0E1E\u0E31\u0E12\u0E19\u0E32\u0E22\u0E38\u0E17\u0E18\u0E28\u0E32\u0E2A\u0E15\u0E23\u0E4C\u0E41\u0E25\u0E30\u0E41\u0E1C\u0E19\u0E07\u0E32\u0E19"]
+      // ฝ่ายและงาน
+      ["resource", "\u0E1D\u0E48\u0E32\u0E22\u0E1A\u0E23\u0E34\u0E2B\u0E32\u0E23\u0E17\u0E23\u0E31\u0E1E\u0E22\u0E32\u0E01\u0E23"],
+      ["plan", "\u0E1D\u0E48\u0E32\u0E22\u0E1E\u0E31\u0E12\u0E19\u0E32\u0E22\u0E38\u0E17\u0E18\u0E28\u0E32\u0E2A\u0E15\u0E23\u0E4C\u0E41\u0E25\u0E30\u0E41\u0E1C\u0E19\u0E07\u0E32\u0E19"],
+      ["student", "\u0E1D\u0E48\u0E32\u0E22\u0E1E\u0E31\u0E12\u0E19\u0E32\u0E01\u0E34\u0E08\u0E01\u0E32\u0E23\u0E19\u0E31\u0E01\u0E40\u0E23\u0E35\u0E22\u0E19 \u0E19\u0E31\u0E01\u0E28\u0E36\u0E01\u0E29\u0E32"],
+      ["academic", "\u0E1D\u0E48\u0E32\u0E22\u0E27\u0E34\u0E0A\u0E32\u0E01\u0E32\u0E23"],
+      ["digital", "\u0E07\u0E32\u0E19\u0E28\u0E39\u0E19\u0E22\u0E4C\u0E14\u0E34\u0E08\u0E34\u0E17\u0E31\u0E25\u0E41\u0E25\u0E30\u0E2A\u0E37\u0E48\u0E2D\u0E2A\u0E32\u0E23\u0E2D\u0E07\u0E04\u0E4C\u0E01\u0E23"]
     ],
     position: [
       ["director", "\u0E1C\u0E39\u0E49\u0E2D\u0E33\u0E19\u0E27\u0E22\u0E01\u0E32\u0E23"],
@@ -1886,6 +1954,10 @@ var Domain = (() => {
       ["staff", "\u0E40\u0E08\u0E49\u0E32\u0E2B\u0E19\u0E49\u0E32\u0E17\u0E35\u0E48"]
     ]
   };
+  function missingDefaultLookups(existing, kind) {
+    const have = new Set(existing.filter((item) => item.kind === kind).map((item) => item.key));
+    return defaultLookups().filter((item) => item.kind === kind && !have.has(item.key));
+  }
   function defaultLookups() {
     return LOOKUP_KINDS.flatMap((kind) => SEED[kind].map(([key, label, note = ""], index) => ({
       lookupId: `lk-${kind}-${key}`,

@@ -72,6 +72,10 @@ export const SHEET_SPECS: SheetSpec[] = [
       'createdAt',
       'updatedAt',
       'position',
+      'phone',
+      // TRUE = ผู้ดูแลตั้งรหัสให้ เจ้าของบัญชีต้องตั้งใหม่เองก่อนใช้งานอื่น (server บังคับใน authenticate_)
+      'mustChangePassword',
+      'mustChangePin',
     ],
   },
   {

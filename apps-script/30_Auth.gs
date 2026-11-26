@@ -77,6 +77,12 @@ function newPasswordCredential_(username, password) {
   return { passwordSalt: salt, passwordHash: passwordHash_(username, salt, password) };
 }
 
+function passwordMatches_(row, password) {
+  const hash = row === null ? '' : String(row.passwordHash || '');
+  return hash !== '' &&
+    Domain.constantTimeEqual(passwordHash_(String(row.username), String(row.passwordSalt || ''), password), hash);
+}
+
 function pinMatches_(row, pin) {
   const hash = row === null ? '' : String(row.pinHash || '');
   return hash !== '' && Domain.constantTimeEqual(pinHash_(String(row.username), String(row.pinSalt || ''), pin), hash);
@@ -145,10 +151,7 @@ function login_(raw) {
   assertNotLocked_(username);
 
   const user = findByKey_(Domain.SHEET_USERS, username);
-  const hash = user === null ? '' : String(user.passwordHash || '');
-  const ok = hash !== '' &&
-    Domain.constantTimeEqual(passwordHash_(username, String(user.passwordSalt || ''), parsed.value.password), hash);
-  if (!ok) {
+  if (!passwordMatches_(user, parsed.value.password)) {
     recordPinFailure_(username);
     throw appError_(ERROR_CODES.UNAUTHENTICATED, 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
   }
@@ -221,14 +224,30 @@ function publicUser_(user) {
     role: Domain.normalizeUserRole(user.role),
     status: String(user.status || 'active'),
     allowedRoomIds: Domain.readList(user, 'allowedRoomIds'),
+    phone: String(user.phone || ''),
+    mustChangePassword: Domain.readBoolean(user, 'mustChangePassword', false),
+    mustChangePin: Domain.readBoolean(user, 'mustChangePin', false),
   };
 }
 
 /**
- * ตรวจ session token แล้วคืนผู้ใช้ "ตามข้อมูลในชีต ณ ตอนนี้"
- * อ่านชีตทุกคำขอโดยตั้งใจ เพื่อให้การถอนสิทธิ์มีผลทันที ไม่ใช่รอ token หมดอายุ
+ * ผู้ใช้ที่เข้าสู่ระบบแล้วและพร้อมใช้งาน — ทุกคำสั่งที่ต้องล็อกอินผ่านตรงนี้
+ * บัญชีที่ผู้ดูแลสั่งให้ตั้งรหัสใหม่ ทำอะไรไม่ได้จนกว่าจะตั้งเสร็จ (บังคับที่ server ไม่ใช่แค่ซ่อนหน้าเว็บ)
  */
 function authenticate_(token) {
+  const user = authenticateAllowPending_(token);
+  if (user.mustChangePassword || user.mustChangePin) {
+    throw appError_(ERROR_CODES.CHANGE_REQUIRED, 'กรุณาตั้งรหัสผ่านและ PIN ของคุณเองก่อนใช้งาน');
+  }
+  return user;
+}
+
+/**
+ * ตรวจ session token แล้วคืนผู้ใช้ "ตามข้อมูลในชีต ณ ตอนนี้" — ยอมให้บัญชีที่ยังต้องตั้งรหัสใหม่ผ่าน
+ * ใช้เฉพาะคำสั่งที่บัญชีแบบนั้นต้องใช้: me, bootstrap, changeOwnCredentials
+ * อ่านชีตทุกคำขอโดยตั้งใจ เพื่อให้การถอนสิทธิ์มีผลทันที ไม่ใช่รอ token หมดอายุ
+ */
+function authenticateAllowPending_(token) {
   const result = Domain.verifySessionToken(
     token,
     sessionSecret_(),

@@ -30,7 +30,8 @@ const TONE_CLASS = {
  * ห้องไหนกำลังใช้ / ว่างอยู่ตอนนี้ — นับเฉพาะรายการที่อนุมัติแล้ว
  * ข้อมูลมีแค่ห้องกับเวลา พนักงานทุกคนจึงเห็นได้ครบทุกห้อง โดยไม่เห็นว่าใครจองอะไร
  */
-export function RoomStatusNow({ rooms, refreshKey }: { rooms: DemoRoom[]; refreshKey: number }) {
+/** narrow = วางในหน้าที่แคบกว่าหน้าภาพรวม (หน้าของฉัน) — สูงสุด 2 คอลัมน์ ชื่อห้องไม่ถูกตัด */
+export function RoomStatusNow({ rooms, refreshKey, narrow = false }: { rooms: DemoRoom[]; refreshKey: number; narrow?: boolean }) {
   const { api, token } = useApp();
   const settings = useSettings();
   const [slots, setSlots] = useState<DaySlot[] | null>(null);
@@ -63,12 +64,12 @@ export function RoomStatusNow({ rooms, refreshKey }: { rooms: DemoRoom[]; refres
   const free = list.filter((item) => item.tone === 'free' || item.tone === 'soon').length;
 
   return (
-    <Card className="mb-5">
+    <Card className={narrow ? '' : 'mb-5'}>
       <CardHeader
         title="สถานะห้องตอนนี้"
         description={slots === null ? 'กำลังโหลด…' : `เวลา ${formatTimeOfDay(nowMin)} น. · กำลังใช้ ${busy} ห้อง · ว่าง ${free} ห้อง`}
       />
-      <ul className="grid border-t border-line sm:grid-cols-2 xl:grid-cols-4">
+      <ul className={cn('grid border-t border-line sm:grid-cols-2', !narrow && 'xl:grid-cols-4')}>
         {list.map(({ room, text, tone }) => (
           <li key={room.roomId} className="-mt-px flex min-h-14 items-center justify-between gap-3 border-t border-line px-5 py-2.5">
             <span className="min-w-0">

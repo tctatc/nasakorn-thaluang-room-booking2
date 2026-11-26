@@ -31,6 +31,10 @@ interface AppState {
   bootError: string | null;
   signInWithPassword(username: string, password: string): Promise<void>;
   signInWithPin(pin: string): Promise<void>;
+  /** ใช้ session ใหม่ที่ server ออกให้ (หลังเปลี่ยนรหัสผ่าน/PIN ของตัวเอง) */
+  adoptSession(result: LoginResult): Promise<void>;
+  /** อัปเดตข้อมูลผู้ใช้ปัจจุบันหลังแก้โปรไฟล์ */
+  replaceUser(user: SessionUser): void;
   signOut(): void;
   retryBoot(): void;
 }
@@ -145,6 +149,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
   const signInWithPin = useCallback(async (pin: string) => startSession(await api.loginPin(pin)), [api, startSession]);
 
+  const replaceUser = useCallback((next: SessionUser) => setUser(next), []);
+
   const signOut = useCallback(() => {
     removeLocal(TOKEN_KEY);
     setToken('');
@@ -172,6 +178,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       bootError,
       signInWithPassword,
       signInWithPin,
+      adoptSession: startSession,
+      replaceUser,
       signOut,
       retryBoot,
     }),
@@ -188,6 +196,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       bootError,
       signInWithPassword,
       signInWithPin,
+      startSession,
+      replaceUser,
       signOut,
       retryBoot,
     ],

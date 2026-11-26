@@ -57,7 +57,7 @@ export function TopNav({ role, badges }: { role: UserRole; badges: Record<string
                   )}
                 >
                   <item.icon className="size-5 shrink-0" aria-hidden="true" />
-                  <span aria-hidden="true">{TOP_LABEL[item.path] ?? item.label}</span>
+                  <span aria-hidden="true">{item.shortLabel ?? TOP_LABEL[item.path] ?? item.label}</span>
                   {badge > 0 && (
                     <span aria-hidden="true" className="absolute left-1/2 top-1 ml-1 grid h-5 min-w-5 place-items-center rounded-full bg-gold px-1.5 text-xs font-semibold leading-none text-ink ring-2 ring-surface motion-safe:animate-[pop_200ms_var(--ease-out)_both] xl:static xl:ring-0">
                       {badge > 99 ? '99+' : badge}
