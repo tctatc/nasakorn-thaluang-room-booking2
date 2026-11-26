@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  AirVent, CalendarDays, Check, ChevronDown, Clock3, DoorOpen, FileText, History, Pencil, UserRound, MapPin, Mic, Package, Paperclip, Projector, Send, Users, Volume2, Wifi, X, type LucideIcon,
+  AirVent, CalendarDays, Check, ChevronDown, DoorOpen, FileText, History, Info, Maximize2, Pencil, UserRound, MapPin, Mic, Package, Paperclip, Projector, Send, Users, Volume2, Wifi, X, type LucideIcon,
 } from 'lucide-react';
 import {
   ATTACHMENT_ACCEPT, ATTACHMENT_LOCAL_MAX_BYTES, ATTACHMENT_MAX_BYTES, ATTACHMENT_TYPES_TEXT, formatFileSize, validateAttachmentUpload,
@@ -12,7 +12,7 @@ import { businessWindow } from '@shared/domain/booking-rules';
 import { conflictingSlots, isEndBlocked, isStartBlocked } from '@shared/domain/availability';
 import { addDaysToDateKey, dayOfWeekOfDateKey, toDateKey, toMinutesOfDay } from '@shared/time/bangkok';
 import { isOpenLocationRoom } from '@shared/schemas/room';
-import type { RequestFacility } from '@shared/schemas/booking';
+import { FURNITURE_NOTICE_TH, type RequestFacility } from '@shared/schemas/booking';
 import { useLookups } from '../../lib/hooks/useLookups';
 import type { SystemSettings } from '@shared/schemas/settings';
 import { useApp } from '../../app/providers/AppProvider';
@@ -25,10 +25,13 @@ import { TimeSelect } from '../../components/ui/TimeSelect';
 import { RoomAvailability } from '../../components/ui/RoomAvailability';
 import { DayTimeline } from '../../components/ui/DayTimeline';
 import { useRoomAvailability } from '../../lib/hooks/useRoomAvailability';
+import { DESKTOP_QUERY, useMediaQuery } from '../../lib/hooks/useMediaQuery';
 import { cn } from '../../lib/cn';
 import type { DemoRoom } from '../../lib/api/demo';
 import { ROOM_BANDS } from './roomBands';
 import { FormPreviewDialog } from '../requestForm/FormPreviewDialog';
+import { RequestFormSheet } from '../requestForm/RequestFormSheet';
+import { ScaledSheet } from '../requestForm/ScaledSheet';
 import { adjustEndTime, asMinute, endTimeOptions, firstFreeStart, startTimeOptions, timeText } from './timeOptions';
 
 const inputClass = 'min-h-11 w-full rounded-control border border-line bg-surface px-3 text-base text-ink outline-none transition-colors duration-150 focus:border-brand focus:ring-2 focus:ring-brand/20';
@@ -129,6 +132,8 @@ export function BookingPage() {
   const [namePrefix, setNamePrefix] = useState(savedBooker?.namePrefix ?? 'นาย');
   const [bookerName, setBookerName] = useState(savedBooker?.bookerName ?? '');
   const [previewOpen, setPreviewOpen] = useState(false);
+  // แบบคำขอด้านขวามีเฉพาะจอใหญ่ — มือถือไม่ต้องวาดแผ่นที่ซ่อนอยู่ทุกครั้งที่พิมพ์
+  const isDesktop = useMediaQuery(DESKTOP_QUERY, false);
   const closePreview = useCallback(() => setPreviewOpen(false), []);
   const lookups = useLookups();
   // ตำแหน่งและหน่วยงานเติมจากบัญชีผู้ใช้ — แก้ได้ถ้าจองแทนคนอื่น
@@ -282,7 +287,8 @@ export function BookingPage() {
   return (
     <>
       <PageHeader title="จองห้องประชุม" description="เลือกห้อง วัน และเวลา ระบบเช็กให้ทันทีว่าห้องว่างไหม" />
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
+      {/* จอใหญ่: ฟอร์มซ้าย แบบคำขอที่เติมให้ขณะพิมพ์อยู่ขวา (ติดจอตอนเลื่อน) */}
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start xl:grid-cols-[minmax(0,1fr)_440px]">
         <form id="booking-form" className="enter-stagger min-w-0 space-y-5" onSubmit={submit}>
           {error && <Alert tone="danger" title="จองไม่สำเร็จ">{error}</Alert>}
           {!user && !savedBooker && (
@@ -580,7 +586,7 @@ export function BookingPage() {
             <div className="grid gap-4 sm:grid-cols-[11rem_minmax(0,1fr)]">
               <div>
                 <label className={labelClass} htmlFor="extra-furniture">โต๊ะ/เก้าอี้เพิ่ม (ตัว)</label>
-                <input className={inputClass} id="extra-furniture" type="number" inputMode="numeric" min="0" max="500" value={extraFurnitureCount} onChange={(e) => setExtraFurnitureCount(e.target.value)} />
+                <input className={inputClass} id="extra-furniture" type="number" inputMode="numeric" min="0" max="500" value={extraFurnitureCount} onChange={(e) => setExtraFurnitureCount(e.target.value)} aria-describedby="furniture-notice" />
               </div>
               <div>
                 <label className={labelClass} htmlFor="other-facility">อุปกรณ์อื่น ๆ</label>
@@ -602,6 +608,11 @@ export function BookingPage() {
                   })}
                 </div>
               </div>
+              {/* ข้อความจากแบบคำขอฉบับปรับปรุง — ชัดขึ้นเมื่อขอโต๊ะ/เก้าอี้เพิ่ม */}
+              <p id="furniture-notice" className={cn('flex gap-2 rounded-control px-3 py-2 text-sm sm:col-span-2', (Number(extraFurnitureCount) || 0) > 0 ? 'bg-warn-soft font-medium text-warn' : 'bg-surface-sunken text-ink-muted')}>
+                <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                {FURNITURE_NOTICE_TH}
+              </p>
             </div>
               <div>
                 <label className={labelClass} htmlFor="meeting-type">ประเภทการประชุม <span className="font-normal text-ink-subtle">(ถ้ามี)</span></label>
@@ -644,7 +655,7 @@ export function BookingPage() {
           <button
             type="button"
             onClick={() => setPreviewOpen(true)}
-            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-card border border-dashed border-brand-border bg-brand-soft/60 px-4 text-base font-medium text-brand transition-colors hover:bg-brand-soft"
+            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-card lg:hidden border border-dashed border-brand-border bg-brand-soft/60 px-4 text-base font-medium text-brand transition-colors hover:bg-brand-soft"
           >
             <FileText className="size-5" aria-hidden="true" />
             ดูตัวอย่างแบบฟอร์มคำขอที่จะพิมพ์ออกมา
@@ -654,40 +665,43 @@ export function BookingPage() {
 
         <aside
           aria-label="สรุปการจอง"
-          className="sticky bottom-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom))] z-10 -mx-4 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur lg:top-6 lg:bottom-auto lg:mx-0 lg:overflow-hidden lg:rounded-card lg:border lg:bg-surface lg:p-0 lg:shadow-raised lg:backdrop-blur-none"
+          className="sticky bottom-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom))] z-10 -mx-4 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur lg:top-[5.5rem] lg:bottom-auto lg:mx-0 lg:flex lg:max-h-[calc(100dvh-6.5rem)] lg:flex-col lg:overflow-hidden lg:rounded-card lg:border lg:bg-surface lg:p-0 lg:shadow-raised lg:backdrop-blur-none"
         >
-          <div className="hidden lg:block">
-            <div className={`relative overflow-hidden bg-gradient-to-br px-5 py-4 text-ink-inverse ${room ? band(room.roomId) : 'from-blue-700 to-blue-950'}`}>
+          <div className="hidden lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
+            <div className={`relative shrink-0 overflow-hidden bg-gradient-to-br px-5 py-3.5 text-ink-inverse ${room ? band(room.roomId) : 'from-blue-700 to-blue-950'}`}>
               <span aria-hidden="true" className="absolute -right-8 -top-10 size-32 rounded-full bg-white/10" />
               <p className="text-sm text-ink-inverse/80">สรุปการจอง</p>
-              <p className="mt-0.5 text-lg font-semibold leading-snug">{openLocation ? customLocation.trim() || 'สถานที่อื่น (ยังไม่ระบุ)' : room?.name ?? 'ยังไม่ได้เลือกห้อง'}</p>
-              {title.trim() && <p className="mt-0.5 line-clamp-2 text-sm text-ink-inverse/85">เรื่อง {title.trim()}</p>}
+              <p className="mt-0.5 truncate text-lg font-semibold leading-snug">{openLocation ? customLocation.trim() || 'สถานที่อื่น (ยังไม่ระบุ)' : room?.name ?? 'ยังไม่ได้เลือกห้อง'}</p>
+              <p className="mt-0.5 text-sm text-ink-inverse/90">
+                {thaiDate(dateKey, { day: 'numeric', month: 'short', year: 'numeric' })} · <span className={cn(roomConflict && 'rounded bg-danger px-1 text-ink-inverse')}>{start}–{end} น.</span> ({durationText(endMin - startMin)})
+                {' · '}<span className={cn(overCapacity && 'rounded bg-warn px-1 text-ink-inverse')}>{attendeeCount}{room && !openLocation ? `/${capacity}` : ''} คน</span>
+              </p>
             </div>
-            <dl className="space-y-3 px-5 py-4 text-sm">
-              <SummaryRow icon={CalendarDays} label="วันที่">{thaiDate(dateKey, { dateStyle: 'long' })}</SummaryRow>
-              <SummaryRow icon={Clock3} label="เวลา">
-                <span className={cn(roomConflict && 'text-danger')}>{start}–{end} น.</span>
-                <span className="text-ink-muted"> ({durationText(endMin - startMin)})</span>
-              </SummaryRow>
-              <SummaryRow icon={Users} label="ผู้เข้าร่วม">
-                <span className={cn(overCapacity && 'text-warn')}>{attendeeCount} คน</span>
-                {room && !openLocation && <span className="text-ink-muted"> จาก {capacity} ที่นั่ง</span>}
-              </SummaryRow>
-              {requestedFacilities.length > 0 && (
-                <SummaryRow icon={Projector} label="ขอใช้">
-                  {requestedFacilities.map((key) => lookups.label('facility', key)).join(', ')}
-                </SummaryRow>
+
+            {/* แบบคำขอจริงที่จะพิมพ์ เติมให้ทุกครั้งที่กรอก — กดที่แผ่นหรือปุ่มขยายเพื่อดูเต็มจอ */}
+            <div className="flex shrink-0 items-center gap-2 border-b border-line px-4 py-2">
+              <FileText className="size-4 shrink-0 text-brand" aria-hidden="true" />
+              <p className="min-w-0 flex-1 truncate text-sm font-medium text-ink">แบบคำขอ <span className="font-normal text-ink-muted">· กรอกให้อัตโนมัติ</span></p>
+              <button type="button" onClick={() => setPreviewOpen(true)} className="inline-flex min-h-9 items-center gap-1.5 rounded-control px-2.5 text-sm font-medium text-brand transition-colors duration-150 hover:bg-brand-soft">
+                <Maximize2 className="size-4" aria-hidden="true" />ขยาย
+              </button>
+            </div>
+            <div aria-hidden="true" className="min-h-0 flex-1 cursor-zoom-in overflow-y-auto bg-surface-sunken p-3" onClick={() => setPreviewOpen(true)}>
+              {isDesktop && (
+                <ScaledSheet>
+                  <RequestFormSheet data={formData} roomCode={room?.code ?? ''} roomName={room?.name} className="shadow-card" />
+                </ScaledSheet>
               )}
-            </dl>
+            </div>
           </div>
 
           <p className="truncate text-sm font-medium text-ink lg:hidden">
             {room?.name ?? 'เลือกห้อง'} · {thaiDate(dateKey, { day: 'numeric', month: 'short' })} · <span className={cn(roomConflict && 'text-danger')}>{start}–{end} น.</span>
           </p>
-          <p className={cn('mt-0.5 text-xs lg:mt-0 lg:border-t lg:border-line lg:px-5 lg:py-3', missing.length ? 'text-warn' : 'text-ok')}>
+          <p className={cn('mt-0.5 shrink-0 text-xs lg:mt-0 lg:border-t lg:border-line lg:px-5 lg:py-2.5 lg:text-sm', missing.length ? 'text-warn' : 'text-ok')}>
             {missing.length ? `ยังขาด: ${missing.join(' · ')}` : rules.approvalRequired ? (user ? 'พร้อมส่ง คำขอจะผ่านการอนุมัติ 3 ขั้น ติดตามได้ที่รายการจองของฉัน' : 'พร้อมส่ง ส่งแล้วได้ QR ไว้ติดตามผลอนุมัติ') : 'พร้อมส่ง ส่งแล้วได้ห้องทันที'}
           </p>
-          <div className="mt-2 flex gap-3 lg:mt-0 lg:flex-col-reverse lg:gap-2 lg:px-5 lg:pb-5">
+          <div className="mt-2 flex shrink-0 gap-3 lg:mt-0 lg:gap-2 lg:px-5 lg:pb-4">
             <Button variant="secondary" onClick={() => nav(-1)}>กลับ</Button>
             <Button form="booking-form" className="flex-1" type="submit" icon={<Send className="size-4" aria-hidden="true" />} loading={busy} loadingLabel="กำลังบันทึก" disabled={!roomId || !termsAccepted || roomConflict || readingFile}>
               ส่งคำขอจอง
@@ -726,14 +740,3 @@ function Section({ step, title, hint, done, children }: { step: number; title: s
   );
 }
 
-function SummaryRow({ icon: Icon, label, children }: { icon: LucideIcon; label: string; children: ReactNode }) {
-  return (
-    <div className="flex gap-3">
-      <Icon className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden="true" />
-      <div className="min-w-0">
-        <dt className="text-xs text-ink-subtle">{label}</dt>
-        <dd className="font-medium text-ink">{children}</dd>
-      </div>
-    </div>
-  );
-}

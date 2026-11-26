@@ -2,6 +2,7 @@
 
 import { createDemoTransport } from './demo';
 import { createHttpTransport } from './transport';
+import { withReadCache } from './readCache';
 import type { AdminUser, AttachmentInput, BootstrapResult, LineSendResult, LineStatus, LoginResult, SessionUser, Transport, VersionResult } from './types';
 import type { AttachmentFile } from '@shared/schemas/attachment';
 import type { UserAccountInput } from '@shared/schemas/user';
@@ -182,5 +183,7 @@ function wrap(transport: Transport): ApiClient {
 }
 
 export function createApiClient(options: { apiUrl: string; demo: boolean }): ApiClient {
-  return wrap(options.demo ? createDemoTransport() : createHttpTransport(options.apiUrl));
+  // โหมดทดลองข้อมูลอยู่ในเบราว์เซอร์อยู่แล้ว ไม่ต้องเก็บลงเครื่องซ้ำ (ยังได้ประโยชน์จากการไม่เรียกซ้ำ)
+  const transport = options.demo ? createDemoTransport() : createHttpTransport(options.apiUrl);
+  return wrap(withReadCache(transport, { persist: !options.demo }));
 }

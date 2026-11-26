@@ -19,7 +19,7 @@ function readLookups_() {
 
 function listLookups_() {
   addMissingDepartments_(false);
-  return { lookups: Domain.sortLookups(readLookups_()) };
+  return { lookups: cachedRead_('lookups', function () { return Domain.sortLookups(readLookups_()); }) };
 }
 
 /** รุ่นของรายชื่อแผนกตั้งต้น — เปลี่ยนเมื่อแก้รายการใน shared/schemas/lookup.ts เพื่อให้เติมรอบใหม่ */

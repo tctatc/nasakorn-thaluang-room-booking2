@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { APPROVAL_STEPS, type ApprovalEntry } from '@shared/domain/approval';
-import { REQUEST_FACILITIES, REQUEST_FACILITY_LABEL_TH } from '@shared/schemas/booking';
+import { FURNITURE_NOTICE_TH, REQUEST_FACILITIES, REQUEST_FACILITY_LABEL_TH } from '@shared/schemas/booking';
 import { useLookups } from '../../lib/hooks/useLookups';
 import { COLLEGE_ROOMS, OPEN_LOCATION_ROOM_CODE } from '@shared/schemas/room';
 import { cn } from '../../lib/cn';
@@ -122,6 +122,8 @@ export function RequestFormSheet({ data, roomCode, roomName, className }: {
         <span className="w-[10mm]" />
         <Box checked={otherFacilities !== ''} />&nbsp;อื่น ๆ <Fill grow>{otherFacilities}</Fill>
       </Line>
+      {/* แบบฟอร์มฉบับปรับปรุง: เพิ่มบรรทัดนี้ใต้ช่องโต๊ะ/เก้าอี้ ตัวเล็กกว่าข้อความปกติ */}
+      <p className="text-[9.8pt] tracking-[-0.1pt]">{FURNITURE_NOTICE_TH}</p>
       <p>ข้าพเจ้าขอรับรองว่าจะดูแลรักษาทรัพย์สินของทางราชการ และปฏิบัติตามระเบียบของวิทยาลัยโดยเคร่งครัด</p>
 
       <div className="mt-[2mm] grid grid-cols-2 border border-black">

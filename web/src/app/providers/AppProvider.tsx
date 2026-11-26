@@ -10,10 +10,27 @@ import {
 import type { SystemSettings } from '@shared/schemas/settings';
 import { createApiClient, type ApiClient } from '../../lib/api/client';
 import { readAppConfig, type AppConfig } from '../../lib/api/config';
-import { ApiError, type LoginResult, type SessionUser } from '../../lib/api/types';
+import { ApiError, type BootstrapResult, type LoginResult, type SessionUser } from '../../lib/api/types';
 import { readLocal, removeLocal, writeLocal } from '../../lib/storage';
 
 const TOKEN_KEY = 'mrb.session.token';
+/**
+ * ผลเข้าระบบครั้งล่าสุด (ชื่อ สิทธิ์ ค่าตั้งค่า) — เปิดเว็บครั้งหน้าแสดงหน้าได้ทันที ไม่ต้องรอ server 2–4 วินาที
+ * แล้วค่อยตรวจกับ server เบื้องหลัง ถ้า session ใช้ไม่ได้แล้วจะออกจากระบบเอง
+ * สิทธิ์ที่เก็บไว้มีผลแค่หน้าตา — ทุกคำสั่ง server ตรวจสิทธิ์จริงอีกครั้งเสมอ
+ */
+const BOOT_KEY = 'mrb.boot.v1';
+/** ผูกกับ token ด้วยส่วนท้าย — token เปลี่ยน (เข้าระบบใหม่/บัญชีอื่น) ข้อมูลเก่าใช้ไม่ได้ */
+const tokenTag = (token: string) => token.slice(-16);
+
+function readCachedBoot(token: string): BootstrapResult | null {
+  try {
+    const saved = JSON.parse(readLocal(BOOT_KEY) ?? 'null') as { tag?: string; boot?: BootstrapResult } | null;
+    return saved?.tag === tokenTag(token) && saved.boot?.user && saved.boot.settings ? saved.boot : null;
+  } catch {
+    return null;
+  }
+}
 
 type Phase = 'booting' | 'anonymous' | 'ready';
 
@@ -92,20 +109,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
 
     let cancelled = false;
-    setPhase('booting');
+    // มีผลครั้งก่อน: แสดงหน้าเลย แล้วตรวจกับ server ตามหลัง
+    const cached = readCachedBoot(token);
+    // เวลาของ server ในผลเก่าอาจเป็นเมื่อวาน — ใช้เวลาเครื่องไปก่อนจนกว่าผลใหม่มาถึง
+    if (cached) { setToken(token); applyBootstrap({ ...cached, serverTime: new Date().toISOString() }); } else setPhase('booting');
 
     api
       .bootstrap(token)
       .then((result) => {
-        if (!cancelled) { setToken(token); applyBootstrap(result); }
+        if (cancelled) return;
+        writeLocal(BOOT_KEY, JSON.stringify({ tag: tokenTag(token), boot: result }));
+        setToken(token);
+        applyBootstrap(result);
       })
       .catch((error: unknown) => {
         if (cancelled) return;
         if (error instanceof ApiError && (error.requiresLogin || error.code === 'FORBIDDEN')) {
           removeLocal(TOKEN_KEY);
+          removeLocal(BOOT_KEY);
+          setToken('');
+          setUser(null);
           setPhase('anonymous');
           return;
         }
+        // เครือข่ายมีปัญหาแต่มีข้อมูลครั้งก่อน: ใช้งานต่อได้ คำสั่งที่ส่งไปจะแจ้งข้อผิดพลาดเอง
+        if (cached) return;
         setBootError(
           error instanceof Error ? error.message : 'เชื่อมต่อระบบไม่สำเร็จ',
         );
@@ -138,6 +166,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     async (result: LoginResult) => {
       const boot = await api.bootstrap(result.token);
       writeLocal(TOKEN_KEY, result.token);
+      writeLocal(BOOT_KEY, JSON.stringify({ tag: tokenTag(result.token), boot }));
       setToken(result.token);
       applyBootstrap(boot);
     },
@@ -149,10 +178,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
   const signInWithPin = useCallback(async (pin: string) => startSession(await api.loginPin(pin)), [api, startSession]);
 
-  const replaceUser = useCallback((next: SessionUser) => setUser(next), []);
+  const replaceUser = useCallback((next: SessionUser) => {
+    setUser(next);
+    // เก็บผลที่แก้แล้วไว้ด้วย ไม่งั้นเปิดเว็บครั้งหน้าจะเห็นค่าเก่าแวบหนึ่ง
+    const token = readLocal(TOKEN_KEY);
+    const cached = token === null ? null : readCachedBoot(token);
+    if (token !== null && cached) writeLocal(BOOT_KEY, JSON.stringify({ tag: tokenTag(token), boot: { ...cached, user: next } }));
+  }, []);
 
   const signOut = useCallback(() => {
     removeLocal(TOKEN_KEY);
+    removeLocal(BOOT_KEY);
     setToken('');
     setUser(null);
     setSettings(null);

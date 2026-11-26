@@ -40,6 +40,8 @@ function setupSystem() {
 
   // 3) ชีตทั้งหมด
   log.push(...migrateSheets());
+  // แก้ชีตด้วยมือมาก่อนรันสคริปต์นี้ได้ — ล้างแคชการอ่านให้เห็นค่าใหม่ทันที
+  clearReadCache_();
   // สร้างโฟลเดอร์เอกสารแนบไว้ก่อน (และให้ Google ขอสิทธิ์ Drive ตั้งแต่ตอนติดตั้ง ไม่ใช่ตอนผู้ใช้จองครั้งแรก)
   log.push(`โฟลเดอร์เอกสารแนบ (ส่วนตัว ห้ามแชร์): ${attachmentFolder_().getUrl()}`);
   log.push(getProp_(PROP_LINE_TOKEN) === ''

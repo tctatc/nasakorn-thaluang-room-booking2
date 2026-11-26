@@ -35,12 +35,12 @@ function countHourly_(name) {
 
 /** ค่าที่หน้าเว็บต้องใช้ก่อนเข้าสู่ระบบ (กฎการจองสำหรับฟอร์ม) */
 function publicBootstrap_() {
-  return { settings: readSettings_(), dataVersion: getDataVersion_(), serverTime: nowIso_() };
+  return { settings: readSettings_(), dataVersion: cachedDataVersion_(), serverTime: nowIso_() };
 }
 
 /** ห้องทั้งหมด — ผู้จองทั่วไปไม่มีการจำกัดห้องรายบุคคล (การจำกัดใช้กับบัญชีที่ล็อกอินเท่านั้น) */
 function publicRooms_() {
-  return { rooms: readAll_(Domain.SHEET_ROOMS).objects.map(publicRoom_) };
+  return { rooms: cachedRooms_() };
 }
 
 function publicSchedule_(raw) {

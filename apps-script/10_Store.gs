@@ -202,12 +202,53 @@ function findByKey_(name, keyValue) {
 /* ---------- ค่าตั้งค่าระบบ ---------- */
 
 function readSettings_() {
-  const all = readAll_(Domain.SHEET_SETTINGS);
-  const result = Domain.readSettingsOrDefault(all.rows);
-  if (result.problems.length > 0) {
-    console.warn(`ค่าตั้งค่าในชีตมีปัญหา ใช้ค่าเริ่มต้นแทน: ${result.problems.join(' | ')}`);
+  return cachedRead_('settings', function () {
+    const all = readAll_(Domain.SHEET_SETTINGS);
+    const result = Domain.readSettingsOrDefault(all.rows);
+    if (result.problems.length > 0) {
+      console.warn(`ค่าตั้งค่าในชีตมีปัญหา ใช้ค่าเริ่มต้นแทน: ${result.problems.join(' | ')}`);
+    }
+    return result.settings;
+  });
+}
+
+/* ---------- แคชข้อมูลที่อ่านบ่อยแต่แทบไม่เปลี่ยน (ค่าตั้งค่า ห้อง รายการตั้งต้น) ---------- */
+
+/*
+ * ทุกคำขอเปิดไฟล์ชีตใช้เวลาเพิ่ม ~0.5–1 วินาที — ข้อมูลกลุ่มนี้เก็บใน CacheService แทน
+ * กุญแจผูกกับเลขเวอร์ชันข้อมูล: ทุกการแก้ผ่านระบบเรียก bumpDataVersion_ แคชเก่าจึงหลุดเองทันที
+ * แก้ชีตด้วยมือ (ไม่ผ่านหน้าเว็บ) จะเห็นผลภายใน READ_CACHE_TTL_S หรือรัน setupSystem() เพื่อล้างทันที
+ * ไม่แคชชีต Users และ Bookings — สิทธิ์และการจองต้องสดเสมอ
+ */
+const READ_CACHE_TTL_S = 600;
+const DATA_VERSION_CACHE_KEY = 'dataVersion';
+
+function cachedDataVersion_() {
+  const cache = CacheService.getScriptCache();
+  const hit = cache.get(DATA_VERSION_CACHE_KEY);
+  if (hit !== null) return Number(hit) || 0;
+  const value = getDataVersion_();
+  cache.put(DATA_VERSION_CACHE_KEY, String(value), 21600);
+  return value;
+}
+
+function cachedRead_(name, build) {
+  const cache = CacheService.getScriptCache();
+  const key = `read:${name}:${cachedDataVersion_()}`;
+  const hit = cache.get(key);
+  if (hit !== null) {
+    try { return JSON.parse(hit); } catch (error) { /* แคชเสีย อ่านใหม่จากชีต */ }
   }
-  return result.settings;
+  const value = build();
+  const text = JSON.stringify(value);
+  // CacheService เก็บได้ไม่เกิน 100KB ต่อค่า — ใหญ่กว่านั้นอ่านจากชีตทุกครั้งตามเดิม
+  if (text.length < 90000) cache.put(key, text, READ_CACHE_TTL_S);
+  return value;
+}
+
+/** ล้างแคชการอ่าน (เช่นหลังแก้ชีตด้วยมือ) — เปลี่ยนเลขในแคชให้กุญแจเก่าใช้ไม่ได้ */
+function clearReadCache_() {
+  CacheService.getScriptCache().remove(DATA_VERSION_CACHE_KEY);
 }
 
 /* ---------- ตัวนับเวอร์ชันข้อมูล สำหรับให้หน้าเว็บถามว่ามีอะไรเปลี่ยนไหม ---------- */
@@ -228,5 +269,6 @@ function bumpDataVersion_() {
   if (!updateByKey_(Domain.SHEET_META, 'dataVersion', { key: 'dataVersion', value: next })) {
     appendObject_(Domain.SHEET_META, { key: 'dataVersion', value: next });
   }
+  CacheService.getScriptCache().put(DATA_VERSION_CACHE_KEY, String(next), 21600);
   return next;
 }

@@ -27,7 +27,8 @@ export function useLookups(): Lookups {
   const [items, setItems] = useState<LookupItem[]>(() => cached ?? defaultLookups());
 
   const reload = useCallback(async () => {
-    if (!api || token === '') return;
+    // ไม่ได้เข้าสู่ระบบก็โหลดได้ (server ส่งรายการแบบไม่มีหมายเหตุ) — ผู้จองทั่วไปเห็นแผนก/อุปกรณ์ที่ผู้ดูแลเพิ่มด้วย
+    if (!api) return;
     try {
       const { lookups } = await api.lookups(token);
       cached = lookups;

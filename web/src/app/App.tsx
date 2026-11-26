@@ -1,26 +1,36 @@
-import type { ReactNode } from 'react';
+import { lazy, Suspense, type ReactNode } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AppShell } from '../components/layout/AppShell';
 import { LoadingState } from '../components/ui/States';
-import { DashboardPage } from '../features/dashboard/DashboardPage';
 import { NotFoundPage } from '../features/NotFoundPage';
 import { LoginPage } from '../features/auth/LoginPage';
 import { BookingPage, BookingsPage, RoomsPage } from '../features/BookingPages';
-import { ApprovalsPage, PrintFormPage } from '../features/ApprovalReportPages';
-import { UsersPage } from '../features/users/UsersPage';
-import { ManagePage } from '../features/manage/ManagePage';
 import { PublicShell } from '../components/layout/PublicShell';
 import { PublicHomePage } from '../features/public/PublicHomePage';
-import { QrPosterPage } from '../features/public/QrPosterPage';
 import { TrackLookupPage, TrackPage } from '../features/track/TrackPage';
 import { NAV_ITEMS } from './navigation';
-import { ReviewsPage } from '../features/reviews/ReviewsPage';
-import { ReportsPage } from '../features/reports/ReportsPage';
-import { AttachmentPage } from '../features/attachment/AttachmentPage';
 import { canSeeAllBookings } from '@shared/domain/approval';
 import { useApp } from './providers/AppProvider';
 import { ForceChangePage } from '../features/account/ForceChangePage';
 import { MyPage } from '../features/account/MyPage';
+
+/*
+ * หน้าที่คนส่วนใหญ่ไม่ได้เปิด (หลังบ้าน รายงาน พิมพ์ฟอร์ม) แยกไฟล์ โหลดเมื่อกดเข้าไปเท่านั้น
+ * หน้าจอง/ติดตาม/หน้าของฉันอยู่ในไฟล์หลัก เปิดแล้วใช้ได้ทันที
+ */
+const DashboardPage = lazy(() => import('../features/dashboard/DashboardPage').then((m) => ({ default: m.DashboardPage })));
+const ApprovalsPage = lazy(() => import('../features/ApprovalReportPages').then((m) => ({ default: m.ApprovalsPage })));
+const PrintFormPage = lazy(() => import('../features/ApprovalReportPages').then((m) => ({ default: m.PrintFormPage })));
+const UsersPage = lazy(() => import('../features/users/UsersPage').then((m) => ({ default: m.UsersPage })));
+const ManagePage = lazy(() => import('../features/manage/ManagePage').then((m) => ({ default: m.ManagePage })));
+const QrPosterPage = lazy(() => import('../features/public/QrPosterPage').then((m) => ({ default: m.QrPosterPage })));
+const ReviewsPage = lazy(() => import('../features/reviews/ReviewsPage').then((m) => ({ default: m.ReviewsPage })));
+const ReportsPage = lazy(() => import('../features/reports/ReportsPage').then((m) => ({ default: m.ReportsPage })));
+const AttachmentPage = lazy(() => import('../features/attachment/AttachmentPage').then((m) => ({ default: m.AttachmentPage })));
+
+function PageLoading() {
+  return <div className="grid min-h-[40vh] place-items-center"><LoadingState message="กำลังเปิดหน้า" /></div>;
+}
 
 /** หน้าแรกหลังเข้าสู่ระบบ: ผู้ใช้งานทั่วไปเห็นหน้าของฉัน (คำขอของตัวเอง) ผู้ลงนามและผู้ดูแลเห็นภาพรวมทั้งระบบ */
 function HomePage() {
@@ -68,6 +78,7 @@ export function App() {
 
   if (phase === 'anonymous') {
     return (
+      <Suspense fallback={<PageLoading />}>
       <Routes>
         <Route element={<PublicShell />}>
           <Route path="/" element={<PublicHomePage />} />
@@ -79,6 +90,7 @@ export function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="*" element={<StaffPathOrHome />} />
       </Routes>
+      </Suspense>
     );
   }
 
@@ -88,6 +100,7 @@ export function App() {
   }
 
   return (
+    <Suspense fallback={<PageLoading />}>
     <Routes>
       <Route element={<AppShell />}>
         <Route path="/" element={<HomePage />} />
@@ -114,5 +127,6 @@ export function App() {
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>
+    </Suspense>
   );
 }

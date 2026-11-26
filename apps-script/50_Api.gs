@@ -18,7 +18,7 @@ function doGet(e) {
   try {
     if (action === 'version') {
       // endpoint เบาที่สุดสำหรับให้หน้าเว็บถามทุก 15 วินาทีว่ามีอะไรเปลี่ยนไหม
-      return jsonOutput_({ ok: true, data: { dataVersion: getDataVersion_(), serverTime: nowIso_() } });
+      return jsonOutput_({ ok: true, data: { dataVersion: cachedDataVersion_(), serverTime: nowIso_() } });
     }
     return jsonOutput_({
       ok: true,
@@ -110,7 +110,7 @@ function apiHandlers_() {
       return {
         user: user,
         settings: readSettings_(),
-        dataVersion: getDataVersion_(),
+        dataVersion: cachedDataVersion_(),
         serverTime: nowIso_(),
       };
     },

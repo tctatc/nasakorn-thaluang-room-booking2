@@ -1,4 +1,6 @@
+import { Suspense } from 'react';
 import { Outlet } from 'react-router-dom';
+import { LoadingState } from '../ui/States';
 import { useApp } from '../../app/providers/AppProvider';
 import { usePendingApprovals } from '../../lib/hooks/usePendingApprovals';
 import { BottomNav } from './BottomNav';
@@ -26,7 +28,10 @@ export function AppShell() {
       {/* เว้นที่ด้านล่างเท่าเมนูด้านล่าง + ขอบ iPhone เนื้อหาบรรทัดสุดท้ายจะได้ไม่ถูกเมนูบัง */}
       <main id="main" className="flex-1 px-4 pt-4 pb-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom)+1.5rem)] lg:px-6 lg:py-8">
         <div className="mx-auto max-w-7xl">
-          <Outlet />
+          {/* หน้าที่แยกไฟล์ (หลังบ้าน รายงาน) โหลดอยู่ — เมนูยังอยู่ กดไปหน้าอื่นได้ */}
+          <Suspense fallback={<div className="grid min-h-[40vh] place-items-center"><LoadingState message="กำลังเปิดหน้า" /></div>}>
+            <Outlet />
+          </Suspense>
         </div>
       </main>
 

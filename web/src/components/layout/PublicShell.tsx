@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { CalendarCheck2, CalendarPlus, LayoutDashboard, LogIn, Search } from 'lucide-react';
 import { useApp } from '../../app/providers/AppProvider';
@@ -55,7 +56,7 @@ export function PublicShell() {
 
       <main id="main" className="flex-1 px-4 pt-5 pb-[calc(var(--bottom-nav-height)+env(safe-area-inset-bottom)+1.5rem)] md:pb-10 lg:px-6 lg:pt-8">
         <div className="mx-auto max-w-5xl">
-          {settings !== null ? <Outlet /> : bootError ? (
+          {settings !== null ? <Suspense fallback={<LoadingState message="กำลังเปิดหน้า" />}><Outlet /></Suspense> : bootError ? (
             <div className="mx-auto max-w-md rounded-card bg-surface p-6 text-center shadow-card">
               <p className="text-lg font-semibold text-ink">เชื่อมต่อระบบไม่สำเร็จ</p>
               <p className="mt-1 text-base text-ink-muted">{bootError}</p>

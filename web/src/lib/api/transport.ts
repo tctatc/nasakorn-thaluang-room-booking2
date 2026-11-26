@@ -71,6 +71,7 @@ function normalizeCode(code: string): ApiError['code'] {
     'VALIDATION',
     'BUSY',
     'NOT_CONFIGURED',
+    'CHANGE_REQUIRED',
     'INTERNAL',
   ];
   return (known.includes(code) ? code : 'INTERNAL') as ApiError['code'];

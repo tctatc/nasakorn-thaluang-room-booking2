@@ -11,9 +11,14 @@ function publicRoom_(row) {
 
 /** ผู้ใช้ที่ผู้ดูแลจำกัดห้องไว้ เห็นเฉพาะห้องที่ได้รับสิทธิ์ (ผู้ดูแลเห็นทุกห้อง) */
 function listRooms_(user) {
-  return { rooms: readAll_(Domain.SHEET_ROOMS).objects.map(publicRoom_).filter(function (room) {
+  return { rooms: cachedRooms_().filter(function (room) {
     return Domain.canUseRoom(user, room.roomId);
   }) };
+}
+
+/** รายการห้องทั้งหมด (ผ่านแคช) — ใช้แสดงผลเท่านั้น การจองอ่านห้องจากชีตสดใต้ล็อกเสมอ */
+function cachedRooms_() {
+  return cachedRead_('rooms', function () { return readAll_(Domain.SHEET_ROOMS).objects.map(publicRoom_); });
 }
 
 /**

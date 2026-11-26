@@ -95,6 +95,13 @@ async function signOutVia(user: ReturnType<typeof userEvent.setup>) {
   await screen.findByRole('heading', { level: 1, name: 'เข้าสู่ระบบ' });
 }
 
+/** ตัวฟอร์มจอง (ไม่รวมแบบคำขอตัวอย่างด้านขวา ที่ซ้ำข้อความเดียวกัน) */
+function bookingForm(): HTMLElement {
+  const form = document.getElementById('booking-form');
+  if (form === null) throw new Error('ไม่พบฟอร์มจอง');
+  return form;
+}
+
 async function goTo(user: ReturnType<typeof userEvent.setup>, nav: HTMLElement, label: string) {
   await user.click(within(nav).getByRole('link', { name: label }));
   await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toBeDefined());
@@ -288,7 +295,8 @@ describe('สิทธิ์ผู้ใช้', () => {
     const testerNav = await signInAs('tester', 'Tester2026');
     await goTo(user, testerNav, 'จองห้องประชุม');
     await waitFor(() => expect(screen.getAllByText('ห้องประชุมสักทอง').length).toBeGreaterThan(0), { timeout: 3000 });
-    expect(screen.queryByText('หอประชุมอดิเรกสาร')).toBeNull();
+    // ดูเฉพาะในฟอร์ม — แบบคำขอตัวอย่างด้านขวาพิมพ์ชื่อห้องทั้ง 6 ห้องตามกระดาษเสมอ
+    expect(within(bookingForm()).queryByText('หอประชุมอดิเรกสาร')).toBeNull();
   }, 30_000);
 
   it('ผู้ดูแลลบตัวเองไม่ได้ แต่รีเซ็ต PIN คนอื่นแล้ว PIN เดิมใช้ไม่ได้', async () => {
@@ -389,7 +397,7 @@ describe('สิทธิ์ผู้ใช้', () => {
     // จองห้อง: ใช้ข้อมูลจากบัญชี ไม่ต้องพิมพ์ชื่อหรือเบอร์
     window.location.hash = '#/book';
     expect(await screen.findByText('ข้อมูลจากบัญชีของคุณ', {}, { timeout: 5000 })).toBeDefined();
-    expect(screen.getByText('081-555-0101')).toBeDefined();
+    expect(within(bookingForm()).getByText('081-555-0101')).toBeDefined();
     expect(screen.queryByLabelText('หมายเลขโทรศัพท์')).toBeNull();
   }, 40_000);
 });
@@ -828,7 +836,8 @@ describe('รายงานสรุปและสถานะห้องต�
   it('ผู้ดูแลดูรายงานตามช่วงที่กำหนด แล้วส่งออกเป็นไฟล์ Excel ได้', async () => {
     const { user, nav } = await openApp();
     await goTo(user, nav, 'รายงานสรุป');
-    await user.click(screen.getByRole('radio', { name: 'กำหนดเอง' }));
+    // หน้ารายงานแยกไฟล์ โหลดเมื่อเปิด
+    await user.click(await screen.findByRole('radio', { name: 'กำหนดเอง' }, { timeout: 5000 }));
     const today = toDateKey(new Date());
     fireEvent.change(screen.getByLabelText('ตั้งแต่วันที่'), { target: { value: addDaysToDateKey(today, -7) } });
     fireEvent.change(screen.getByLabelText('ถึงวันที่'), { target: { value: addDaysToDateKey(today, 7) } });
@@ -907,7 +916,7 @@ describe('ผู้จองทั่วไป: จองได้โดยไ�
 
     // จองครั้งต่อไปจากเครื่องเดิม: ข้อมูลผู้จองขึ้นให้เลย กด "ไม่ใช่ฉัน" แล้วล้างทิ้ง
     await user.click(within(screen.getByRole('navigation', { name: 'เมนูหลัก' })).getByRole('link', { name: /จองห้อง/ }));
-    expect(await screen.findByText('นายผู้จอง ทั่วไป')).toBeDefined();
+    await waitFor(() => expect(within(bookingForm()).getByText('นายผู้จอง ทั่วไป')).toBeDefined());
     expect(screen.queryByLabelText('หมายเลขโทรศัพท์')).toBeNull();
     expect(screen.queryByText('จองได้เลย ไม่ต้องเข้าสู่ระบบ')).toBeNull();
     await user.click(screen.getByRole('button', { name: 'ไม่ใช่ฉัน' }));
