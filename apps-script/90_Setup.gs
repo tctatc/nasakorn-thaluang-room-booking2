@@ -236,3 +236,41 @@ function rotateSessionSecret() {
   console.log(message);
   return message;
 }
+
+/**
+ * กู้บัญชีผู้ดูแล `shoyu` เมื่อเข้าระบบไม่ได้ (ลืมรหัส / ถูกล็อก)
+ * กด Run ใน Apps Script Editor เท่านั้น — เฉพาะเจ้าของโปรเจกต์ที่เปิด Editor ได้ หน้าเว็บเรียกฟังก์ชันนี้ไม่ได้
+ * ตั้งรหัสผ่านและ PIN ใหม่ (ค่าเดิมใช้ไม่ได้ทันที) เปิดใช้งานบัญชี ให้สิทธิ์ผู้ดูแล ปลดล็อก และเด้งทุกเครื่องที่ค้างอยู่ออก
+ * ค่าใหม่ขึ้นใน Execution log ครั้งเดียว
+ */
+function resetAdminAccess() {
+  const username = 'shoyu';
+  const result = withScriptLock_(function () {
+    const row = findByKey_(Domain.SHEET_USERS, username);
+    if (row === null) return null;
+    let pin = randomPin_();
+    while (readAll_(Domain.SHEET_USERS).objects.some(function (other) {
+      return String(other.username) !== username && pinMatches_(other, pin);
+    })) pin = randomPin_();
+    const password = randomPassword_();
+    updateByKey_(Domain.SHEET_USERS, username, Object.assign(
+      newPinCredential_(username, pin), newPasswordCredential_(username, password),
+      { role: 'admin', status: 'active', tokenVersion: (Number(row.tokenVersion) || 1) + 1, updatedAt: nowIso_() },
+    ));
+    return { password: password, pin: pin };
+  });
+  if (result === null) {
+    const missing = `ไม่พบบัญชี ${username} — รัน setupSystem() เพื่อสร้างใหม่ (รหัสจะขึ้นใน log)`;
+    console.log(missing);
+    return missing;
+  }
+  const cache = CacheService.getScriptCache();
+  cache.remove(pinFailureKey_(username));
+  cache.remove(loginFailureKey_());
+  cache.remove(pinLoginFailureKey_());
+  audit_('system', 'user.resetAdminAccess', 'user', username, {});
+  clearStoreCache_();
+  const message = `ตั้งรหัสใหม่ให้ ${username} แล้ว\nรหัสผ่าน: ${result.password}\nPIN: ${result.pin}\nจดไว้ — ค่านี้แสดงครั้งเดียว`;
+  console.log(message);
+  return 'ดูรหัสใหม่ใน Execution log';
+}
